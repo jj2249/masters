@@ -5,7 +5,7 @@ from functions import *
 
 ALPHA = 1.0
 BETA = 1.0
-C = 10.0
+C = 1.0
 T = 1.0
 
 
