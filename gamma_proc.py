@@ -3,6 +3,11 @@ import matplotlib.pyplot as plt
 from sys import argv
 from functions import *
 
+
+def marginal_gamma(x, t, c, beta, samps=1000):
+	plt.plot(x, (np.power(beta, c*t))/(gamma(c*t))*np.power(x, (c*t)-1)*np.exp(-beta*x))
+
+
 def gen_gamma_process(c, beta, rate, samps, maxT=1):
 	# generate a set of poisson epochs
 	es = gen_poisson_epochs(rate, samps)
