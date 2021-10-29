@@ -10,11 +10,6 @@ BETA = 1.0
 C = 10.0
 T = 1.0
 
-def moving_average(x, w):
-    return np.convolve(x, np.ones(w), 'valid') / w
-
-# generate_and_plot(lambda: gen_gamma_process(C, BETA, 1.0, 1000, maxT=T), 10000, gamma_marginal=lambda: marginal_gamma(np.linspace(0, 30, 1000), T, C, BETA))
-# generate_and_plot(lambda: gen_ts_process(ALPHA, C, BETA, 1.0, 1000, maxT=T), 100)
 
 df = pd.read_csv('./test_data.csv')
 times = np.flip(df["Time"].values)
