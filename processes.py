@@ -2,13 +2,17 @@ import numpy as np
 import matplotlib.pyplot as plt
 from sys import argv
 from functions import *
+from scipy.stats import gamma
 
 
 def marginal_gamma(x, t, c, beta, axes, samps=1000):
 	"""
 	Plot the marginal gamma distribution on a given set of axes
 	"""
-	axes.plot(x, (np.power(beta, c*t))/(gamma(c*t))*np.power(x, (c*t)-1)*np.exp(-beta*x))
+	axes.plot(x, gamma.pdf(x, c*t, scale=1/beta))
+
+def gamma_cdf(x, t, c, beta, axes, samps=1000):
+	axes.plot(x, gamma.cdf(x, c*t, scale=1/beta))
 
 
 def gen_gamma_process(c, beta, rate, samps, maxT=1):
