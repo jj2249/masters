@@ -40,7 +40,10 @@ def gen_gamma_process(c, beta, rate, samps, maxT=1):
 
 	# return gamma process - SHOULD (0,0) be set as the first value??
 
-	gamma_process = np.cumsum(jumps)
+	gamma_process = np.roll(np.cumsum(jumps), 1)
+	gamma_process[0] = 0.0
+	times_sorted = np.roll(times_sorted, 1)
+	times_sorted[0] = 0.0
 
 	return times_sorted, gamma_process
 
@@ -98,7 +101,7 @@ def variance_gamma(mu, sigma_sq, gamma_proc, maxT=1, returnBM=False):
 		normal = np.random.randn(1)
 		if returnBM:
 			B[i] = B[i-1] + np.sqrt(sigma_sq*(t[i]-t[i-1]))*normal + mu*(t[i]-t[i-1])
-		X[i] = X[i-1] + np.sqrt(sigma_sq*gamma_jumps[i-1])*normal + mu*gamma_jumps[i-1]
+		X[i] = X[i-1] + np.sqrt((sigma_sq)*gamma_jumps[i-1])*normal + mu*gamma_jumps[i-1]
 	vg_times = np.linspace(0, maxT, samps)
 	if returnBM:
 		return t, B, vg_times, X
