@@ -1,6 +1,9 @@
 import numpy as np
-from functions import gen_poisson_epochs
+from functions import gen_poisson_epochs, sort_jumps
 from tqdm import tqdm
+from scipy.linalg import cholesky
+from scipy.stats import multivariate_normal
+import matplotlib.pyplot as plt
 
 # desperately need to vectorise langevin_S -- currently langevin_S does 120its/sec, langevin_m does 20,000its/sec ....
 
@@ -13,36 +16,31 @@ def langevin_m(alpha, theta, V, c, deltat, Epochs):
 	vec2 = np.array([[-1./theta],[0.]])
 	# print(np.exp(theta*(t-V)).shape)
 	# print(vec1.shape)
-
+	t = c*deltat
 	# only accept epochs up to some truncated level
-	summand = np.power(np.where(Epochs<c*deltat, Epochs, 0), -1./alpha)*(np.exp(theta*(t-V))*vec1 + vec2)
-	return T**(1./alpha) * np.sum(summand, axis=1)
+	epochs_trunc = np.where(Epochs<t, Epochs, np.inf)
+	summand = np.power(epochs_trunc, -1)*(np.exp(theta*(t-V))*vec1 + vec2)
+	return alpha*deltat*np.sum(summand, axis=1)
 
-def langevin_S(alpha,theta, V, T, Epochs):
+def langevin_S(alpha, theta, V, c, deltat, Epochs):
 	"""
 	calculate the S vector for the langevin model
 	"""
+	t = c*deltat
 	mat1 = np.array([[1./(theta**2),1./theta],[1./theta,1]])
 	mat2 = np.array([[2./(theta**2),-1./theta],[-1./theta,0]])
 	mat3 = np.array([[1./(theta**2),0],[0,0]])
 	# would quite like to vectorise this
 	# hard because need to mutiply a 4x4 array by an array of scalar values - output should be an array of 4x4's
 	tot = 0
-	for i in range(V.shape[0]):
+	epochs_trunc = np.where(Epochs<t, Epochs, np.inf)
+	for i in range(epochs_trunc.shape[0]):
 		term1 = np.exp(2*theta*(t-V[i]))*mat1
 		term2 = np.exp(theta*(t-V[i]))*mat2
 		term3 = mat3
-		tot += np.power(Epochs[i], -1./alpha)*(term1 + term2 + term3)
-	return T**(2./alpha) * tot
+		tot += np.power(epochs_trunc[i], -1)*(term1 + term2 + term3)
+	return alpha*deltat*tot
 
-T = 1.
-t = 1.
-th = 0.5
-dt = 1.
-C = 10. # for gamma process
-e = gen_poisson_epochs(1., 1000)
-v = T*np.random.rand(1000)
-c=10
 
 def build_mat_exp(theta, dt):
 	return np.array([[1, (np.exp(theta*dt)-1)/theta],[0, np.exp(theta*dt)]])
@@ -105,4 +103,34 @@ def kalman_update(preva_pr, prevC_pr, Hmat, kv):
 	return newa, newC
 
 
-print(kalman_predict(build_a00(1, 0.), build_C00(1, 1.), build_A(build_mat_exp(th, dt), langevin_m(C*t, th, v, c, dt, e)), build_B(1), langevin_S(C*t, th, v, c, dt, e)))
+T = 1.
+th = 0.0001
+dt = 1./1000.
+C = 10. # for gamma process
+mw = 1.
+sws = 1.
+
+def generate_langevin_ss(muw, theta, dt, C, T, esamps):
+	t = dt
+	samps = int(T/dt)
+	Xnew = multivariate_normal.rvs(mean=build_a00(1, muw), cov=build_C00(1, 1.)).T
+	A1 = build_mat_exp(theta, dt)
+	Xs = np.zeros((samps, 2))
+	for i in tqdm(range(samps)):
+		Xs[i] = Xnew
+		Xold = Xnew
+		e = gen_poisson_epochs(1./t, esamps) # generate a series of poisson epochs up to time t
+		v = T*np.random.rand(esamps)
+		m = langevin_m(C*t, theta, v, t/dt, dt, e) # t/dt is the truncation parameter
+		S = langevin_S(C*t, theta, v, t/dt, dt, e)
+		Xnew = np.matmul(A1, Xold) + Xold[1]*m + np.sqrt(sws)*multivariate_normal.rvs(mean=np.zeros(2), cov=S)
+		t += dt
+	return Xs
+
+
+# print(langevin_m(C*1., th, v, 2./dt, dt, e))
+# print(langevin_S(C*1., th, v, 2./dt, dt, e))
+
+seq = generate_langevin_ss(mw, th, dt, C, T, 1000)
+plt.plot(np.arange(seq.shape[0]), seq[:, 0])
+plt.show()
