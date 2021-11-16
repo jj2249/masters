@@ -102,7 +102,10 @@ def variance_gamma(mu, sigma_sq, gamma_proc, maxT=1, returnBM=False):
 		if returnBM:
 			B[i] = B[i-1] + np.sqrt(sigma_sq*(t[i]-t[i-1]))*normal + mu*(t[i]-t[i-1])
 		X[i] = X[i-1] + np.sqrt((sigma_sq)*gamma_jumps[i-1])*normal + mu*gamma_jumps[i-1]
-	vg_times = np.linspace(0, maxT, samps)
+
+	# need to replace vg times with uniform jumps Vi
+	# vg_times = np.linspace(0, maxT, samps)
+	vg_times = T*np.linspace(samps)
 	if returnBM:
 		return t, B, vg_times, X
 	else:

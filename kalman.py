@@ -43,7 +43,7 @@ def langevin_S(alpha, theta, V, c, deltat, Epochs):
 
 
 def build_mat_exp(theta, dt):
-	return np.array([[1, (np.exp(theta*dt)-1)/theta],[0, np.exp(theta*dt)]])
+	return np.array([[1., (np.exp(theta*dt)-1.)/theta],[0., np.exp(theta*dt)]])
 
 
 def build_A(mat_exp, m_term):
@@ -111,18 +111,29 @@ mw = 1.
 sws = 1.
 
 def generate_langevin_ss(muw, theta, dt, C, T, esamps):
-	t = dt
+	# currently can't start at t = 0 -- does this mean that using rate 1/t is wrong for the poisson?
+	t = 0
+	# number of samps fully defined by final time and timestep
 	samps = int(T/dt)
+	# initial state is a Gaussian rv
 	Xnew = multivariate_normal.rvs(mean=build_a00(1, muw), cov=build_C00(1, 1.)).T
+	# matrix exponential for deterministic component
 	A1 = build_mat_exp(theta, dt)
+	# container for state skeleton
 	Xs = np.zeros((samps, 2))
 	for i in tqdm(range(samps)):
+		# store value
 		Xs[i] = Xnew
 		Xold = Xnew
-		e = gen_poisson_epochs(1./t, esamps) # generate a series of poisson epochs up to time t
+		# generate a series of poisson epochs up to time t -- I think this is probably wrong
+		e = gen_poisson_epochs(1./(t+dt), esamps)
+		# jump times
 		v = T*np.random.rand(esamps)
-		m = langevin_m(C*t, theta, v, t/dt, dt, e) # t/dt is the truncation parameter
+		# calculate the langevin m and S, -- is the choice of C*t as alpha right?
+		# t/dt is the truncation parameter
+		m = langevin_m(C*t, theta, v, t/dt, dt, e) 
 		S = langevin_S(C*t, theta, v, t/dt, dt, e)
+		# process step using the calculate variables
 		Xnew = np.matmul(A1, Xold) + Xold[1]*m + np.sqrt(sws)*multivariate_normal.rvs(mean=np.zeros(2), cov=S)
 		t += dt
 	return Xs
