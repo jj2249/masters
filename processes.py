@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 from sys import argv
 from functions import *
 from scipy.stats import gamma
+from scipy.special import kv
+from scipy.special import gamma as gamma_func
 
 
 def marginal_gamma(x, t, c, beta, axes, samps=1000):
@@ -11,16 +13,29 @@ def marginal_gamma(x, t, c, beta, axes, samps=1000):
 	"""
 	axes.plot(x, gamma.pdf(x, c*t, scale=1/beta))
 
+def marginal_variance_gamma(x, t, c, beta, mu, betahat, axes, samps=1000):
+	gamma_param = np.sqrt(2*beta)
+	nu_param = c*t
+	alpha_param = np.sqrt(betahat**2 + gamma_param**2)
+
+	term1 = np.power(gamma_param, 2*nu_param) * np.power(alpha_param, 1-2*nu_param)
+	term2 = np.sqrt(2*np.pi)*gamma_func(nu_param)*np.power(2, nu_param-1)
+	term3 = beta*np.abs(x-mu)
+	term4 = kv(nu_param-0.5, term3)
+	term5 = np.exp(betahat*(x-mu))
+
+	axes.plot(x, (term1/term2) * np.power(term3, nu_param-0.5) * term4 * term5)
+
 def gamma_cdf(x, t, c, beta, axes, samps=1000):
 	axes.plot(x, gamma.cdf(x, c*t, scale=1/beta))
 
 
-def gen_gamma_process(c, beta, rate, samps, maxT=1):
+def gen_gamma_process(c, beta, samps=1000, maxT=1, return_latents=False):
 	"""
 	Generate a sample gamma process
 	"""
 	# generate a set of poisson epochs
-	es = gen_poisson_epochs(rate, samps)
+	es = gen_poisson_epochs(1./maxT, samps)
 	
 	# jump sizes - Overflow allowed for large Gamma and small c since large jumps are rejected wp 1
 	old_settings = np.seterr()
@@ -44,7 +59,8 @@ def gen_gamma_process(c, beta, rate, samps, maxT=1):
 	gamma_process[0] = 0.0
 	times_sorted = np.roll(times_sorted, 1)
 	times_sorted[0] = 0.0
-
+	if return_latents:
+		return times_sorted, gamma_process, es
 	return times_sorted, gamma_process
 
 def gen_ts_process(alpha, c, beta, rate, samps, maxT=1):
@@ -87,26 +103,15 @@ def generate_brownian_motion(mu, sigma_sq, samps, maxT=1):
 		X[i] = X[i-1] + np.sqrt(sigma_sq*(t[i]-t[i-1]))*normal + mu*(t[i]-t[i-1])
 	return t, X
 
-def variance_gamma(mu, sigma_sq, gamma_proc, maxT=1, returnBM=False):
+def variance_gamma(mu, sigma_sq, latent_times, gamma_proc, maxT=1):
 	"""
 	Generate a sample from the variance gamma process given a gamma subordinator
+	latent times currently passed for clarity as this is the latent times of both the gamma subordinator and the variance gamma
 	"""
 	gamma_jumps = np.diff(gamma_proc)
 	samps = gamma_jumps.shape[0]
-	t = np.linspace(0, maxT, samps)
-	if returnBM:
-		B = np.zeros(samps)
 	X = np.zeros(samps)
 	for i in range(1, samps):
 		normal = np.random.randn(1)
-		if returnBM:
-			B[i] = B[i-1] + np.sqrt(sigma_sq*(t[i]-t[i-1]))*normal + mu*(t[i]-t[i-1])
 		X[i] = X[i-1] + np.sqrt((sigma_sq)*gamma_jumps[i-1])*normal + mu*gamma_jumps[i-1]
-
-	# need to replace vg times with uniform jumps Vi
-	# vg_times = np.linspace(0, maxT, samps)
-	vg_times = T*np.linspace(samps)
-	if returnBM:
-		return t, B, vg_times, X
-	else:
-		return vg_times, X
+	return latent_times[1:], X

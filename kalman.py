@@ -1,9 +1,10 @@
 import numpy as np
-from functions import gen_poisson_epochs, sort_jumps
+from functions import *
 from tqdm import tqdm
 from scipy.linalg import cholesky
 from scipy.stats import multivariate_normal
 import matplotlib.pyplot as plt
+from processes import *
 
 # desperately need to vectorise langevin_S -- currently langevin_S does 120its/sec, langevin_m does 20,000its/sec ....
 
@@ -103,45 +104,82 @@ def kalman_update(preva_pr, prevC_pr, Hmat, kv):
 	return newa, newC
 
 
-T = 1.
-th = 0.0001
-dt = 1./1000.
-C = 10. # for gamma process
-mw = 1.
-sws = 1.
 
-def generate_langevin_ss(muw, theta, dt, C, T, esamps):
-	# currently can't start at t = 0 -- does this mean that using rate 1/t is wrong for the poisson?
-	t = 0
-	# number of samps fully defined by final time and timestep
-	samps = int(T/dt)
+# def generate_langevin_ss(muw, theta, dt, C, T, esamps):
+# 	# currently can't start at t = 0 -- does this mean that using rate 1/t is wrong for the poisson?
+# 	t = 0
+# 	# number of samps fully defined by final time and timestep
+# 	samps = int(T/dt)
+# 	# initial state is a Gaussian rv
+# 	Xnew = multivariate_normal.rvs(mean=build_a00(1, muw), cov=build_C00(1, 1.)).T
+# 	# matrix exponential for deterministic component
+# 	A1 = build_mat_exp(theta, dt)
+# 	# container for state skeleton
+# 	Xs = np.zeros((samps, 2))
+# 	for i in tqdm(range(samps)):
+# 		# store value
+# 		Xs[i] = Xnew
+# 		Xold = Xnew
+# 		# generate a series of poisson epochs up to time t -- I think this is probably wrong
+# 		e = gen_poisson_epochs(1./(t+dt), esamps)
+# 		# jump times
+# 		v = T*np.random.rand(esamps)
+# 		# calculate the langevin m and S, -- is the choice of C*t as alpha right?
+# 		# t/dt is the truncation parameter
+# 		m = langevin_m(C*t, theta, v, t/dt, dt, e) 
+# 		S = langevin_S(C*t, theta, v, t/dt, dt, e)
+# 		# process step using the calculate variables
+# 		Xnew = np.matmul(A1, Xold) + Xold[1]*m + np.sqrt(sws)*multivariate_normal.rvs(mean=np.zeros(2), cov=S)
+# 		t += dt
+# 	return Xs
+
+
+def langevin_update_vector(theta, t1, t2, V, dZ):
+	Vfilt, dZfilt = filter_jumps_by_times(t1, t2, V, dZ)
+	
+	vect2 = np.exp(theta*(t1-Vfilt))
+	vect1 = (vect2-1)/theta
+	return np.array([np.sum(vect1*dZfilt), np.sum(vect2*dZfilt)])
+
+
+def forward_langevin(c, beta, mu, sigma_sq, muprior, kvprior, theta, samps=1000, maxT=1.):
+	V, W, E = gen_gamma_process(c, beta, samps, maxT, return_latents=True)
+	V2, Z = variance_gamma(mu, sigma_sq, V, W, maxT=maxT)
+	dZ = np.diff(Z)
+	V3 = V2[:-1]
+	t = 0.
+	dt = maxT/samps
 	# initial state is a Gaussian rv
-	Xnew = multivariate_normal.rvs(mean=build_a00(1, muw), cov=build_C00(1, 1.)).T
-	# matrix exponential for deterministic component
-	A1 = build_mat_exp(theta, dt)
+	Xcurr = multivariate_normal.rvs(mean=build_a00(1, muprior), cov=build_C00(1, kvprior)).T
 	# container for state skeleton
 	Xs = np.zeros((samps, 2))
-	for i in tqdm(range(samps)):
-		# store value
-		Xs[i] = Xnew
-		Xold = Xnew
-		# generate a series of poisson epochs up to time t -- I think this is probably wrong
-		e = gen_poisson_epochs(1./(t+dt), esamps)
-		# jump times
-		v = T*np.random.rand(esamps)
-		# calculate the langevin m and S, -- is the choice of C*t as alpha right?
-		# t/dt is the truncation parameter
-		m = langevin_m(C*t, theta, v, t/dt, dt, e) 
-		S = langevin_S(C*t, theta, v, t/dt, dt, e)
-		# process step using the calculate variables
-		Xnew = np.matmul(A1, Xold) + Xold[1]*m + np.sqrt(sws)*multivariate_normal.rvs(mean=np.zeros(2), cov=S)
+	eAdt = build_mat_exp(theta, dt)
+	# stochastic sum term in update expression
+	for i in range(samps):
+		Xs[i] = Xcurr
+		term1 = langevin_update_vector(th, t, t+dt, V3, dZ)
+		term2 = np.matmul(eAdt, Xcurr)
+		# print(term1, term2)
+		Xcurr = term1 + term2
 		t += dt
-	return Xs
+	return V3, Xs
 
-
+	## for forward samples --> build matrix exp, generate initial state, need to be able to split V's and Z's according to time intervals
 # print(langevin_m(C*1., th, v, 2./dt, dt, e))
 # print(langevin_S(C*1., th, v, 2./dt, dt, e))
 
-seq = generate_langevin_ss(mw, th, dt, C, T, 1000)
-plt.plot(np.arange(seq.shape[0]), seq[:, 0])
+T = 1.
+th = -0.5
+dt = 1./1000.
+C = 10. 
+# for gamma process
+mw = 0.
+muvg = 0.
+ssq_vg = 1.
+kv = 1.
+BETA = 0.5
+for i in tqdm(range(1)):
+	Times, X = forward_langevin(C, BETA, muvg, ssq_vg, mw, kv, th, samps=1000)
+	Xf = X[:-2, 0]# + 0.01*np.random.randn(X[:-2, 0].shape[0])
+	plt.step(Times, Xf)	
 plt.show()

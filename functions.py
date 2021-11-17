@@ -45,6 +45,7 @@ def generate_and_plot(process, process_samps, axes, hlines=False):
 			axes.step(t, g)
 	return end_points
 
+
 def gen_poisson_epochs(rate, samps):
 	"""
 	Generate poisson epochs with a fixed rate
@@ -52,8 +53,17 @@ def gen_poisson_epochs(rate, samps):
 	times = np.random.exponential(rate, size=samps)
 	return times.cumsum()
 
+
 def moving_average(x, w):
 	"""
 	Simple moving average filter
 	"""
 	return np.convolve(x, np.ones(w), 'valid') / w
+
+
+def filter_jumps_by_times(t1, t2, V, dX):
+	Vf1 = np.asarray(V>t1).nonzero()[0] # dtype implicit
+	Vf2 = np.asarray(V<t2).nonzero()[0]
+	indices = np.intersect1d(Vf1, Vf2)
+
+	return np.take(V, indices), np.take(dX, indices)
