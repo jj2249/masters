@@ -104,36 +104,6 @@ def kalman_update(preva_pr, prevC_pr, Hmat, kv):
 	return newa, newC
 
 
-
-# def generate_langevin_ss(muw, theta, dt, C, T, esamps):
-# 	# currently can't start at t = 0 -- does this mean that using rate 1/t is wrong for the poisson?
-# 	t = 0
-# 	# number of samps fully defined by final time and timestep
-# 	samps = int(T/dt)
-# 	# initial state is a Gaussian rv
-# 	Xnew = multivariate_normal.rvs(mean=build_a00(1, muw), cov=build_C00(1, 1.)).T
-# 	# matrix exponential for deterministic component
-# 	A1 = build_mat_exp(theta, dt)
-# 	# container for state skeleton
-# 	Xs = np.zeros((samps, 2))
-# 	for i in tqdm(range(samps)):
-# 		# store value
-# 		Xs[i] = Xnew
-# 		Xold = Xnew
-# 		# generate a series of poisson epochs up to time t -- I think this is probably wrong
-# 		e = gen_poisson_epochs(1./(t+dt), esamps)
-# 		# jump times
-# 		v = T*np.random.rand(esamps)
-# 		# calculate the langevin m and S, -- is the choice of C*t as alpha right?
-# 		# t/dt is the truncation parameter
-# 		m = langevin_m(C*t, theta, v, t/dt, dt, e) 
-# 		S = langevin_S(C*t, theta, v, t/dt, dt, e)
-# 		# process step using the calculate variables
-# 		Xnew = np.matmul(A1, Xold) + Xold[1]*m + np.sqrt(sws)*multivariate_normal.rvs(mean=np.zeros(2), cov=S)
-# 		t += dt
-# 	return Xs
-
-
 def langevin_update_vector(theta, t1, t2, V, dZ):
 	Vfilt, dZfilt = filter_jumps_by_times(t1, t2, V, dZ)
 	
@@ -142,7 +112,7 @@ def langevin_update_vector(theta, t1, t2, V, dZ):
 	return np.array([np.sum(vect1*dZfilt), np.sum(vect2*dZfilt)])
 
 
-def forward_langevin(c, beta, mu, sigma_sq, muprior, kvprior, theta, samps=1000, maxT=1.):
+def forward_langevin(c, beta, mu, sigma_sq, theta, samps=1000, maxT=1.):
 	V, W, E = gen_gamma_process(c, beta, samps, maxT, return_latents=True)
 	V2, Z = variance_gamma(mu, sigma_sq, V, W, maxT=maxT)
 	dZ = np.diff(Z)
@@ -150,7 +120,7 @@ def forward_langevin(c, beta, mu, sigma_sq, muprior, kvprior, theta, samps=1000,
 	t = 0.
 	dt = maxT/samps
 	# initial state is a Gaussian rv
-	Xcurr = multivariate_normal.rvs(mean=build_a00(1, muprior), cov=build_C00(1, kvprior)).T
+	Xcurr = np.zeros(2)
 	# container for state skeleton
 	Xs = np.zeros((samps, 2))
 	eAdt = build_mat_exp(theta, dt)
@@ -168,18 +138,31 @@ def forward_langevin(c, beta, mu, sigma_sq, muprior, kvprior, theta, samps=1000,
 # print(langevin_m(C*1., th, v, 2./dt, dt, e))
 # print(langevin_S(C*1., th, v, 2./dt, dt, e))
 
+
 T = 1.
-th = -0.5
 dt = 1./1000.
-C = 10. 
-# for gamma process
-mw = 0.
-muvg = 0.
-ssq_vg = 1.
-kv = 1.
-BETA = 0.5
+
+C = 5. # jump arrival rate - Gamma    ---- Large C seems to be causing problems... could it be back to the overflow issue
+BETA = 1.5 # inverse jump size - Gamma
+
+th = -5. # langevin theta < 0
+
+mw = 0. # prior mean for initial state
+kv = 1. # prior variance for initial (mean component) state
+
+muvg = 0. # mu parameter in VG process
+ssq_vg = 1. # variance parameter in VG process
+
+
+fig, [ax1, ax2] = plt.subplots(ncols=2)
 for i in tqdm(range(1)):
-	Times, X = forward_langevin(C, BETA, muvg, ssq_vg, mw, kv, th, samps=1000)
+	Times, X = forward_langevin(C, BETA, muvg, ssq_vg, th, samps=1000)
 	Xf = X[:-2, 0]# + 0.01*np.random.randn(X[:-2, 0].shape[0])
-	plt.step(Times, Xf)	
+	Xd = X[:-2, 1]
+	ax1.plot(Times, Xf, color='orange')	
+	ax2.step(Times, Xd)
+ax2.set_xlabel('t')
+ax1.set_xlabel('t')
+ax1.set_title('x')
+ax2.set_title('xdot')
 plt.show()

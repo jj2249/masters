@@ -13,6 +13,7 @@ def marginal_gamma(x, t, c, beta, axes, samps=1000):
 	"""
 	axes.plot(x, gamma.pdf(x, c*t, scale=1/beta))
 
+
 def marginal_variance_gamma(x, t, c, beta, mu, betahat, axes, samps=1000):
 	gamma_param = np.sqrt(2*beta)
 	nu_param = c*t
@@ -25,6 +26,15 @@ def marginal_variance_gamma(x, t, c, beta, mu, betahat, axes, samps=1000):
 	term5 = np.exp(betahat*(x-mu))
 
 	axes.plot(x, (term1/term2) * np.power(term3, nu_param-0.5) * term4 * term5)
+
+
+def variance_gamma_pdf(x, mu, alpha, beta, lam, samps=1000):
+	gam = np.sqrt(alpha**2 - beta**2)
+	term1 = np.power(gam, 2*lam) * np.power(np.abs(x-mu), lam-0.5) * kv(lam-0.5, alpha*np.abs(x-mu))
+	term2 = np.sqrt(np.pi)*gamma_func(lam) * np.power(2*alpha, lam-0.5)
+	term3 = np.exp(beta*(x-mu))
+	return np.divide(term1, term2) * term3
+
 
 def gamma_cdf(x, t, c, beta, axes, samps=1000):
 	axes.plot(x, gamma.cdf(x, c*t, scale=1/beta))
