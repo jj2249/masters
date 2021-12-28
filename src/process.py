@@ -1,15 +1,16 @@
 import numpy as np
 
 class Process:
-	def __init__(self, samps=1000, maxT=1.):
+	def __init__(self, samps=1000, minT=0., maxT=1.):
 		# implementation parameters
 		self.samps = samps
-		self.rate = 1./maxT
+		self.rate = 1./(maxT-minT)
+		self.minT = minT
 		self.maxT = maxT
 
 class JumpProcess(Process):
-	def __init__(self, samps=1000, maxT=1., jtimes=None, epochs=None):
-		Process.__init__(self, samps=samps, maxT=maxT)
+	def __init__(self, samps=1000, minT=0., maxT=1., jtimes=None, epochs=None):
+		Process.__init__(self, samps=samps, minT=minT, maxT=maxT)
 		
 		# latent parameters
 		if jtimes == None:
@@ -30,16 +31,18 @@ class JumpProcess(Process):
 		Poisson epochs control the jump sizes
 		"""
 		# sum of exponential random variables
-		times = np.random.exponential(self.rate, size=self.samps)
+		times = np.random.exponential(scale=self.rate, size=self.samps)
 		return np.cumsum(times)
 
 	
-	def generate_times(self):
+	def generate_times(self, acc_samps=None):
 		"""
 		Uniformly sample the jump times
 		"""
-		# uniform rvs in [0, maxT)
-		times = self.maxT * np.random.rand(self.samps)
+		if acc_samps == None:
+			acc_samps = self.samps
+		# uniform rvs in [minT, maxT)
+		times = (self.maxT-self.minT) * np.random.rand(acc_samps) + self.minT
 		return times
 
 
@@ -50,7 +53,9 @@ class JumpProcess(Process):
 		# random samples to decide acceptance
 		uniform = np.random.rand(values.shape[0])
 		# accept if the probability is higher than the generated value
-		return np.where(probabilites>values, values, 0)
+		accepted_values = np.where(probabilites>values, values, 0)
+
+		return accepted_values[accepted_values>0.]
 
 
 	def sort_jumps(self):
@@ -62,14 +67,14 @@ class JumpProcess(Process):
 		# return times and jump sizes sorted in this order
 		self.jtimes = np.take(self.jtimes, idx)
 		self.jsizes = np.take(self.jsizes, idx)
-		
 
+		
 
 	def construct_timeseries(self):
 		"""
 		Construct a skeleton process on a uniform discrete time axis
 		"""
-		axis = np.linspace(0., self.maxT, self.samps)
+		axis = np.linspace(self.minT, self.maxT, self.samps)
 		cumulative_jumps = np.cumsum(self.jsizes)
 		timeseries = np.zeros(self.samps)
 
@@ -93,10 +98,11 @@ class JumpProcess(Process):
 
 
 class GammaProcess(JumpProcess):
-	def __init__(self, C, beta, samps=1000, maxT=1.):
-		JumpProcess.__init__(self, samps=samps, maxT=maxT)
+	def __init__(self, C, beta, samps=1000, minT=0., maxT=1.):
+		JumpProcess.__init__(self, samps=samps, minT=minT, maxT=maxT)
 		self.C = C
 		self.beta = beta
+
 
 	def generate(self):
 		# Overflow allowed for large Gamma and small c since large jumps are rejected wp 1
@@ -110,8 +116,9 @@ class GammaProcess(JumpProcess):
 		a = (1+self.beta*x) * np.exp(-self.beta*x)
 
 		self.jsizes = self.accept_samples(x, a)
-		self.jtimes = self.generate_times()
+		self.jtimes = self.generate_times(acc_samps=self.jsizes.shape[0])
 		self.sort_jumps()
+
 
 	def marginal_gamma(self, x, t, ax):
 		"""
@@ -120,11 +127,31 @@ class GammaProcess(JumpProcess):
 		ax.plot(x, gamma.pdf(x, self.C*t, scale=1/self.beta))
 
 
-class VarianceGammaProcess(JumpProcess):
-	def __init__(self, C, beta, mu, sigmasq, samps=1000, maxT=1., jtimes=None, epochs=None):
-		JumpProcess.__init__(self, samps=samps, maxT=maxT, jtimes=jtimes, epochs=epochs)
+	def langevin_drift(self, dt, theta):
+		return np.array([[1., (np.exp(theta*dt)-1.)/theta],
+						 [0., np.exp(theta*dt)]])
 
-		self.W = GammaProcess(C, beta, samps=self.samps, maxT=self.maxT)
+
+	def langevin_m(self, t, theta):
+		vec2 = np.exp(theta*(t - self.jtimes))
+		vec1 = (vec2-1.)/theta
+		return np.sum(np.array([vec1 * self.jsizes,
+							vec2 * self.jsizes]), axis=1)
+
+
+	def langevin_S(self, t, theta):
+		vec1 = np.exp(theta*(t - self.jtimes))
+		vec2 = np.square(vec1)
+		vec3 = (vec2-vec1)/theta
+		return np.sum(np.array([[(vec2-2*vec1+1)/np.square(theta), vec3],
+			[vec3, vec2]]), axis=2)
+
+
+class VarianceGammaProcess(JumpProcess):
+	def __init__(self, C, beta, mu, sigmasq, samps=1000, minT=0., maxT=1., jtimes=None, epochs=None):
+		JumpProcess.__init__(self, samps=samps, minT=minT, maxT=maxT, jtimes=jtimes, epochs=epochs)
+
+		self.W = GammaProcess(C, beta, samps=self.samps, minT=self.minT, maxT=self.maxT)
 		self.W.generate()
 
 		# self.jtimes = self.generate_times()
@@ -136,9 +163,9 @@ class VarianceGammaProcess(JumpProcess):
 
 
 	def generate(self):
-		normal = np.random.randn(self.samps-1)
-		self.jsizes = np.zeros(self.samps)
-		for i in range(1, self.samps):
+		normal = np.random.randn(self.W.jsizes.shape[0]-1)
+		self.jsizes = np.zeros(self.W.jsizes.shape[0])
+		for i in range(1, self.W.jsizes.shape[0]):
 			self.jsizes[i] = self.mu*self.W.jsizes[i-1]+self.sigma*np.sqrt(self.W.jsizes[i-1])*normal[i-1]
 
 
@@ -159,72 +186,70 @@ class VarianceGammaProcess(JumpProcess):
 	# 	axes.plot(x, (term1/term2) * np.power(term3, nu_param-0.5) * term4 * term5)
 
 
-class ngLevyProcess(Process):
-	def __init__(self, Z):
-		# Z is the driving jump process
-		self.Z = Z
-
-		self.maxT = self.Z.maxT
-		self.samps = self.Z.samps
-		self.dt = self.maxT/self.samps
-
-		self.jtimes = self.Z.jtimes
-		self.epochs = self.Z.epochs
-
-
-	def get_drift(self):
-		"""
-		Default to unity case
-		"""
-		return np.exp(self.dt)
-
-
-	def get_jump_sum(self, t):
-		idx = np.argwhere((self.jtimes > t) & (self.jtimes < t+self.dt))
-		Vfilt = self.jtimes[idx]
-		Zfilt = self.Z.jsizes[idx]
-
-		return np.array(np.sum(Zfilt * np.exp(t+self.dt-Vfilt)))
-
-
-	def construct_timeseries(self):
-		drift = self.get_drift()
-		axis = np.linspace(0., self.maxT, self.samps)
-		timeseries = np.zeros((self.samps, drift.shape[1]))
-
-		for i in range(1, self.samps):
-			timeseries[i] = drift @ timeseries[i-1] + self.get_jump_sum(axis[i])
-
-		return axis, timeseries
-
-
-	def plot_timeseries(self, ax):
-		t, f = self.construct_timeseries()
-		for i in range(len(ax)):
-			ax[i].plot(t, f[:,i])
-		return ax
-
-
-
-class LangevinModel(ngLevyProcess):
-	def __init__(self, Z, theta):
+class LangevinModel:
+	def __init__(self, muw, kv, theta, C, beta, nobservations):
 		self.theta = theta
-		ngLevyProcess.__init__(self, Z)
+		self.nobservations = nobservations
+		self.observationtimes = np.cumsum(np.random.exponential(scale=.1, size=nobservations))
+		self.observationvals = []
+		# initial state
+		self.state = np.array([0, 0, muw])
+		self.beta = beta
+		self.C = C
+		self.kv = kv
+
+		self.Bmat = self.B_matrix()
+		self.Hmat = self.H_matrix()
+
+		self.tgen = (time for time in self.observationtimes)
+		self.s = 0
+		self.t = self.tgen.__next__()
 
 
-	def get_drift(self):
-		return np.array([[1., (np.exp(self.theta*self.dt)-1.)/self.theta],
-						 [0., np.exp(self.theta*self.dt)]])
+	def A_matrix(self, Z, m, dt):
+		return np.block([[Z.langevin_drift(dt, self.theta), m.reshape(-1, 1)],
+						[np.zeros((1, 2)), 1.]])
 
 
-	def get_jump_sum(self, t):
-		idx = np.argwhere((self.jtimes > t) & (self.jtimes < t+self.dt))
-		Vfilt = self.jtimes[idx]
-		Zfilt = self.Z.jsizes[idx]
+	def B_matrix(self):
+		return np.vstack([np.eye(2),
+						np.zeros((1, 2))])
 
-		vec2 = np.exp(self.theta * (t+self.dt-Vfilt))
-		vec1 = (vec2 - 1.)/self.theta
 
-		return np.array([np.sum(vec1*Zfilt),
-						np.sum(vec2*Zfilt)])
+	def H_matrix(self):
+		h = np.zeros((1, 3))
+		h[0] = 1.
+		# can also observe the derivative
+		# h[1] = 1.
+		return h
+
+
+	def increment_process(self):
+		Z = GammaProcess(self.C, self.beta, samps=1000, minT=self.s, maxT=self.t)
+		Z.generate()
+		m = Z.langevin_m(self.t, self.theta)
+		S = Z.langevin_S(self.t, self.theta)
+		Sc = np.linalg.cholesky(S + 1e-12*np.eye(2))
+		Amat = self.A_matrix(Z, m, self.t-self.s)
+
+		e = Sc @ np.random.randn(2)
+		self.state = Amat @ self.state + self.Bmat @ e
+
+		new_observation = self.Hmat @ self.state + np.sqrt(self.kv)*np.random.randn()
+		self.observationvals.append(new_observation[0])
+		
+	
+	def forward_simulate(self):
+		for _ in range(self.nobservations-1):
+				self.increment_process()
+				self.s = self.t
+				self.t = self.tgen.__next__()
+		self.observationtimes = self.observationtimes[:-1]
+		self.observationvals = np.array(self.observationvals)
+
+
+
+
+
+
 
