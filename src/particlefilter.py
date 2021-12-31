@@ -150,6 +150,11 @@ class RBPF:
 		return np.sum(weights*means, axis=0)
 
 
+	def get_all_means(self):
+		means = [particle.acc for particle in self.particles]
+		return means[:][0]
+
+
 	def get_state_covariance(self):
 		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
 		covs = np.array([particle.Ccc for particle in self.particles])
