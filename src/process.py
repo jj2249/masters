@@ -1,10 +1,12 @@
 import numpy as np
+from scipy.stats import gamma
 
 class Process:
 	def __init__(self, samps=1000, minT=0., maxT=1.):
 		# implementation parameters
 		self.samps = samps
 		self.rate = 1./(maxT-minT)
+		# self.rate = 1.
 		self.minT = minT
 		self.maxT = maxT
 
@@ -55,7 +57,8 @@ class JumpProcess(Process):
 		# accept if the probability is higher than the generated value
 		accepted_values = np.where(probabilites>values, values, 0)
 
-		return accepted_values[accepted_values>0.]
+		# return accepted_values[accepted_values>0.]
+		return accepted_values
 
 
 	def sort_jumps(self):
@@ -78,7 +81,7 @@ class JumpProcess(Process):
 		cumulative_jumps = np.cumsum(self.jsizes)
 		timeseries = np.zeros(self.samps)
 
-		for i in range(self.samps):
+		for i in range(1, self.samps):
 			occured_jumps = self.jtimes[self.jtimes<axis[i]]
 			if occured_jumps.size == 0:
 				timeseries[i] = 0
@@ -102,29 +105,36 @@ class GammaProcess(JumpProcess):
 		JumpProcess.__init__(self, samps=samps, minT=minT, maxT=maxT)
 		self.C = C
 		self.beta = beta
+		self.jtimes = self.generate_times()
+
+
+	def generate_times(self):
+		jtimes = np.linspace(self.minT, self.maxT, self.samps)
+		return jtimes
 
 
 	def generate(self):
-		# Overflow allowed for large Gamma and small c since large jumps are rejected wp 1
-		old_settings = np.seterr()
-		np.seterr(over='ignore')
-
-		# jump sizes using the epochs
-		x = 1./(self.beta*(np.exp(self.epochs/self.C)-1))
-		np.seterr(**old_settings)
-
-		a = (1+self.beta*x) * np.exp(-self.beta*x)
-
-		self.jsizes = self.accept_samples(x, a)
-		self.jtimes = self.generate_times(acc_samps=self.jsizes.shape[0])
-		self.sort_jumps()
+		dt = self.jtimes[1]-self.jtimes[0]
+		jumps = gamma.rvs(a=dt*self.C, loc=0, scale=1./self.beta, size=self.samps)
+		self.jsizes = jumps
 
 
-	def marginal_gamma(self, x, t, ax):
+	def construct_timeseries(self):
+		return self.jtimes, np.cumsum(self.jsizes)
+
+
+	def marginal_gamma(self, x, t, ax, label=''):
 		"""
 		Plot the marginal gamma distribution on a given set of axes
 		"""
-		ax.plot(x, gamma.pdf(x, self.C*t, scale=1/self.beta))
+		ax.plot(x, gamma.pdf(x, self.C*t, scale=1./self.beta), label=label)
+
+
+	def marginal_gamma_cdf(self, x, t, ax, label=''):
+		"""
+		Plot the marginal gamma distribution on a given set of axes
+		"""
+		ax.plot(gamma.cdf(x, self.C*t, scale=1./self.beta), x, label=label)
 
 
 	def langevin_drift(self, dt, theta):
@@ -143,21 +153,21 @@ class GammaProcess(JumpProcess):
 		vec1 = np.exp(theta*(t - self.jtimes))
 		vec2 = np.square(vec1)
 		vec3 = (vec2-vec1)/theta
-		return np.sum(np.array([[(vec2-2*vec1+1)/np.square(theta), vec3],
-			[vec3, vec2]]), axis=2)
+		return np.sum(np.array([[self.jsizes*(vec2-2*vec1+1)/np.square(theta), self.jsizes*vec3],
+			[self.jsizes*vec3, self.jsizes*vec2]]), axis=2)
 
 
 class VarianceGammaProcess(JumpProcess):
-	def __init__(self, C, beta, mu, sigmasq, samps=1000, minT=0., maxT=1., jtimes=None, epochs=None):
+	def __init__(self, C, beta, theta, sigmasq, samps=1000, minT=0., maxT=1., jtimes=None, epochs=None):
 		JumpProcess.__init__(self, samps=samps, minT=minT, maxT=maxT, jtimes=jtimes, epochs=epochs)
 
-		self.W = GammaProcess(C, beta, samps=self.samps, minT=self.minT, maxT=self.maxT)
+		self.W = GammaProcess(C, beta, samps=samps, minT=minT, maxT=maxT)
 		self.W.generate()
 
 		# self.jtimes = self.generate_times()
 		self.jtimes = self.W.jtimes
 
-		self.mu = mu
+		self.theta = theta
 		self.sigmasq = sigmasq
 		self.sigma = np.sqrt(sigmasq)
 
@@ -166,28 +176,11 @@ class VarianceGammaProcess(JumpProcess):
 		normal = np.random.randn(self.W.jsizes.shape[0]-1)
 		self.jsizes = np.zeros(self.W.jsizes.shape[0])
 		for i in range(1, self.W.jsizes.shape[0]):
-			self.jsizes[i] = self.mu*self.W.jsizes[i-1]+self.sigma*np.sqrt(self.W.jsizes[i-1])*normal[i-1]
-
-
-	# def marginal_variance_gamma(self, x, t, ax):
-	# 	"""
-	# 	NEEDS WORK
-	# 	"""
-	# 	gamma_param = np.sqrt(2*self.beta)
-	# 	nu_param = self.C*t
-	# 	alpha_param = np.sqrt(betahat**2 + gamma_param**2)
-
-	# 	term1 = np.power(gamma_param, 2*nu_param) * np.power(alpha_param, 1-2*nu_param)
-	# 	term2 = np.sqrt(2*np.pi)*gamma_func(nu_param)*np.power(2, nu_param-1)
-	# 	term3 = beta*np.abs(x-mu)
-	# 	term4 = kv(nu_param-0.5, term3)
-	# 	term5 = np.exp(betahat*(x-mu))
-
-	# 	axes.plot(x, (term1/term2) * np.power(term3, nu_param-0.5) * term4 * term5)
+			self.jsizes[i] = self.theta*self.W.jsizes[i-1]+self.sigma*np.sqrt(self.W.jsizes[i-1])*normal[i-1]
 
 
 class LangevinModel:
-	def __init__(self, muw, kv, theta, C, beta, nobservations):
+	def __init__(self, muw, sigmasq, kv, theta, C, beta, nobservations):
 		self.theta = theta
 		self.nobservations = nobservations
 		self.observationtimes = np.cumsum(np.random.exponential(scale=.1, size=nobservations))
@@ -197,6 +190,8 @@ class LangevinModel:
 		self.beta = beta
 		self.C = C
 		self.kv = kv
+		self.sigmasq = sigmasq
+		self.muw = muw
 
 		self.Bmat = self.B_matrix()
 		self.Hmat = self.H_matrix()
@@ -207,7 +202,7 @@ class LangevinModel:
 
 
 	def A_matrix(self, Z, m, dt):
-		return np.block([[Z.langevin_drift(dt, self.theta), m.reshape(-1, 1)],
+		return np.block([[Z.langevin_drift(dt, self.theta), m],
 						[np.zeros((1, 2)), 1.]])
 
 
@@ -227,15 +222,13 @@ class LangevinModel:
 	def increment_process(self):
 		Z = GammaProcess(self.C, self.beta, samps=1000, minT=self.s, maxT=self.t)
 		Z.generate()
-		m = Z.langevin_m(self.t, self.theta)
-		S = Z.langevin_S(self.t, self.theta)
+		m = Z.langevin_m(self.t, self.theta).reshape(-1, 1)
+		S = self.sigmasq*Z.langevin_S(self.t, self.theta)
 		Sc = np.linalg.cholesky(S + 1e-12*np.eye(2))
 		Amat = self.A_matrix(Z, m, self.t-self.s)
-
 		e = Sc @ np.random.randn(2)
 		self.state = Amat @ self.state + self.Bmat @ e
-
-		new_observation = self.Hmat @ self.state + np.sqrt(self.kv)*np.random.randn()
+		new_observation = self.Hmat @ self.state + np.sqrt(self.sigmasq*self.kv)*np.random.randn()
 		self.observationvals.append(new_observation[0])
 		
 	

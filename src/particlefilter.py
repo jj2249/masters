@@ -3,8 +3,12 @@ import copy
 from process import GammaProcess
 import pandas as pd
 
+def logsumexp(x):
+	c = np.max(x)
+	return c + np.log(np.sum(np.exp(x-c)))
+
 class Particle:
-	def __init__(self, P, mumuw, kw, kv, theta, C, beta):
+	def __init__(self, P, mumuw, sigmasq, kw, kv, theta, C, beta):
 		self.theta = theta
 		self.P = P
 		self.kv = kv
@@ -17,7 +21,8 @@ class Particle:
 		self.acc = np.zeros((P+1, 1))
 		self.acc[-1] = mumuw
 		self.Ccc = np.zeros((P+1, P+1))
-		self.Ccc[-1,-1] = kw
+		self.Ccc[-1,-1] = sigmasq*kw
+		self.sigmasq = sigmasq
 
 		# initial state
 		Cc = np.linalg.cholesky(self.Ccc + 1e-12*np.eye(self.P+1))
@@ -49,7 +54,7 @@ class Particle:
 
 	def H_matrix(self):
 		h = np.zeros((1, self.P+1))
-		h[0] = 1.
+		h[:, 0] = 1.
 		return h
 
 
@@ -64,7 +69,7 @@ class Particle:
 		Z.generate()
 
 		m = Z.langevin_m(t, self.theta)
-		S = Z.langevin_S(t, self.theta)
+		S = self.sigmasq*Z.langevin_S(t, self.theta)
 		# come back to this if there a stability issues
 		Sc = np.linalg.cholesky(S+1e-12*np.eye(self.P))
 		e = Sc @ np.random.randn(self.P)
@@ -72,27 +77,24 @@ class Particle:
 		Amat = self.A_matrix(Z, m, dt)
 
 		self.alpha = (Amat @ self.alpha) + (self.Bmat @ e)
-
 		# prediction step
 		acp = Amat @ self.acc
-		Ccp = Amat @ self.Ccc @ Amat.T + self.Bmat @ S @ self.Bmat.T
-
+		Ccp = (Amat @ self.Ccc @ Amat.T) + (self.Bmat @ S @ self.Bmat.T)
 		# Kalman gain
-		K = Ccp @ self.Hmat.T / (self.Hmat @ Ccp @ self.Hmat.T + self.kv)
+		K = (Ccp @ self.Hmat.T) / ((self.Hmat @ Ccp @ self.Hmat.T) + self.sigmasq*self.kv)
 		K = K.reshape(-1, 1)
 		# correction step
-		self.acc = acp + K * (observation - self.Hmat @ acp)
-		self.Ccc = Ccp - K @ self.Hmat @ Ccp
-
+		self.acc = acp + (K * (observation - self.Hmat @ acp))
+		self.Ccc = Ccp - (K @ self.Hmat @ Ccp)
 		# Prediction Error Decomposition
 		ayt = self.Hmat @ acp
-		Cyt = self.Hmat @ Ccp @ self.Hmat.T + self.kv
-
-		self.logweight += float(-0.5 * np.log(2.*np.pi*Cyt) - (1./(2.*Cyt))*np.square(observation-ayt))
+		Cyt = (self.Hmat @ Ccp @ self.Hmat.T) + (self.sigmasq*self.kv)
+		Cyt = Cyt.flatten()
+		self.logweight += -0.5 * np.log(2.*np.pi*Cyt) - (1./(2.*Cyt))*np.square(observation-ayt)
 
 
 class RBPF:
-	def __init__(self, P, mumuw, kw, kv, theta, C, beta, data, N):
+	def __init__(self, P, mumuw, sigmasq, kw, kv, theta, C, beta, data, N):
 
 		self.times = data['Date_Time']
 		self.prices = data['Price']
@@ -111,13 +113,13 @@ class RBPF:
 		self.current_price = self.pricegen.__next__()
 
 		self.N = N
-		self.particles = [Particle(P, mumuw, kw, kv, theta, C, beta) for _ in range(N)]
+		self.particles = [Particle(P, mumuw, sigmasq, kw, kv, theta, C, beta) for _ in range(N)]
 		
 
 	def reweight_particles(self):
 		lweights = np.array([particle.logweight for particle in self.particles])
 		# come back to this if there are underflow problems
-		sum_weights = np.log(np.sum(np.exp(lweights)))
+		sum_weights = logsumexp(lweights)
 		for particle in self.particles:
 			# log domain
 			particle.logweight = particle.logweight - sum_weights
@@ -136,12 +138,18 @@ class RBPF:
 
 	def resample_particles(self):
 		lweights = np.array([particle.logweight for particle in self.particles]).flatten()
-		selections = np.random.multinomial(self.N, np.exp(lweights))
+		probabilites = np.nan_to_num(np.exp(lweights))
+
+		probabilites = probabilites / np.sum(probabilites)
+		# print(probabilites)
+		selections = np.random.multinomial(self.N, probabilites)
 		new_particles = []
 		for idx in range(self.N):
 			for _ in range(selections[idx]):
 				new_particles.append(copy.copy(self.particles[idx]))
 		self.particles = new_particles
+		for particle in self.particles:
+			particle.logweight = -np.log(self.N)
 
 
 	def get_state_mean(self):
