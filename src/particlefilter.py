@@ -8,18 +8,17 @@ def logsumexp(x):
 	return c + np.log(np.sum(np.exp(x-c)))
 
 class Particle:
-	def __init__(self, P, mumuw, sigmasq, kw, kv, theta, C, beta):
+	def __init__(self, P, mumu, sigmasq, beta, kw, kv, theta):
 		self.theta = theta
 		self.P = P
 		self.kv = kv
-		self.C = C
 		self.beta = beta
 
 		# initial kalman parameters
 		# a current current
 		# C current current
 		self.acc = np.zeros((P+1, 1))
-		self.acc[-1] = mumuw
+		self.acc[-1] = mumu
 		self.Ccc = np.zeros((P+1, P+1))
 		self.Ccc[-1,-1] = sigmasq*kw
 		self.sigmasq = sigmasq
@@ -33,6 +32,7 @@ class Particle:
 
 		self.Hmat = self.H_matrix()
 		self.Bmat = self.B_matrix()
+		self.lastobservation = 0.
 		
 
 	def __repr__(self):
@@ -65,9 +65,11 @@ class Particle:
 		if type(t) == pd._libs.tslibs.timedeltas.Timedelta:
 				t = t.total_seconds()
 		dt = t - s
-		Z = GammaProcess(self.C, self.beta, samps=1000, minT=s, maxT=t)
+		Z = GammaProcess(1., self.beta, samps=1000, minT=s, maxT=t)
 		Z.generate()
 
+		# m = self.lastobservation*Z.langevin_m(t, self.theta)
+		# S = (self.lastobservation**2)*self.sigmasq*Z.langevin_S(t, self.theta)
 		m = Z.langevin_m(t, self.theta)
 		S = self.sigmasq*Z.langevin_S(t, self.theta)
 		# come back to this if there a stability issues
@@ -92,9 +94,11 @@ class Particle:
 		Cyt = Cyt.flatten()
 		self.logweight += -0.5 * np.log(2.*np.pi*Cyt) - (1./(2.*Cyt))*np.square(observation-ayt)
 
+		self.lastobservation = self.alpha[0][0]
+
 
 class RBPF:
-	def __init__(self, P, mumuw, sigmasq, kw, kv, theta, C, beta, data, N):
+	def __init__(self, P, mumu, sigmasq, beta, kw, kv, theta, data, N):
 
 		self.times = data['Date_Time']
 		self.prices = data['Price']
@@ -113,7 +117,7 @@ class RBPF:
 		self.current_price = self.pricegen.__next__()
 
 		self.N = N
-		self.particles = [Particle(P, mumuw, sigmasq, kw, kv, theta, C, beta) for _ in range(N)]
+		self.particles = [Particle(P, mumu, sigmasq, beta, kw, kv, theta) for _ in range(N)]
 		
 
 	def reweight_particles(self):

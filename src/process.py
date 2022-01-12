@@ -1,5 +1,8 @@
 import numpy as np
 from scipy.stats import gamma
+from scipy.special import kv
+from scipy.special import gamma as gammaf
+from scipy.integrate import quad
 
 class Process:
 	def __init__(self, samps=1000, minT=0., maxT=1.):
@@ -73,37 +76,41 @@ class JumpProcess(Process):
 
 		
 
+	# def construct_timeseries(self):
+	# 	"""
+	# 	Construct a skeleton process on a uniform discrete time axis
+	# 	"""
+	# 	axis = np.linspace(self.minT, self.maxT, self.samps)
+	# 	cumulative_jumps = np.cumsum(self.jsizes)
+	# 	timeseries = np.zeros(self.samps)
+
+	# 	for i in range(1, self.samps):
+	# 		occured_jumps = self.jtimes[self.jtimes<axis[i]]
+	# 		if occured_jumps.size == 0:
+	# 			timeseries[i] = 0
+	# 		else:
+	# 			jump_idx = np.argmax(occured_jumps)
+	# 			timeseries[i] = cumulative_jumps[jump_idx]
+	# 	return axis, timeseries
+
+
 	def construct_timeseries(self):
-		"""
-		Construct a skeleton process on a uniform discrete time axis
-		"""
-		axis = np.linspace(self.minT, self.maxT, self.samps)
-		cumulative_jumps = np.cumsum(self.jsizes)
-		timeseries = np.zeros(self.samps)
-
-		for i in range(1, self.samps):
-			occured_jumps = self.jtimes[self.jtimes<axis[i]]
-			if occured_jumps.size == 0:
-				timeseries[i] = 0
-			else:
-				jump_idx = np.argmax(occured_jumps)
-				timeseries[i] = cumulative_jumps[jump_idx]
-		return axis, timeseries
+		return self.jtimes, np.cumsum(self.jsizes)
 
 
-	def plot_timeseries(self, ax):
+	def plot_timeseries(self, ax, label=''):
 		"""
 		Plot the process skeleton
 		"""
 		t, f = self.construct_timeseries()
-		ax.step(t, f)
+		ax.step(t, f, label=label)
 		return ax
 
 
 class GammaProcess(JumpProcess):
-	def __init__(self, C, beta, samps=1000, minT=0., maxT=1.):
+	def __init__(self, alpha, beta, samps=1000, minT=0., maxT=1.):
 		JumpProcess.__init__(self, samps=samps, minT=minT, maxT=maxT)
-		self.C = C
+		self.alpha = alpha
 		self.beta = beta
 		self.jtimes = self.generate_times()
 
@@ -115,7 +122,7 @@ class GammaProcess(JumpProcess):
 
 	def generate(self):
 		dt = self.jtimes[1]-self.jtimes[0]
-		jumps = gamma.rvs(a=dt*self.C, loc=0, scale=1./self.beta, size=self.samps)
+		jumps = gamma.rvs(a=dt*self.alpha**2/self.beta, loc=0, scale=self.beta/self.alpha, size=self.samps)
 		self.jsizes = jumps
 
 
@@ -127,14 +134,14 @@ class GammaProcess(JumpProcess):
 		"""
 		Plot the marginal gamma distribution on a given set of axes
 		"""
-		ax.plot(x, gamma.pdf(x, self.C*t, scale=1./self.beta), label=label)
+		ax.plot(gamma.pdf(x, a=t*self.alpha**2/self.beta, loc=0, scale=self.beta/self.alpha), x, label=label)
 
 
 	def marginal_gamma_cdf(self, x, t, ax, label=''):
 		"""
 		Plot the marginal gamma distribution on a given set of axes
 		"""
-		ax.plot(gamma.cdf(x, self.C*t, scale=1./self.beta), x, label=label)
+		ax.plot(x, gamma.cdf(x, a=t*self.alpha**2/self.beta, loc=0, scale=self.beta/self.alpha), label=label)
 
 
 	def langevin_drift(self, dt, theta):
@@ -158,40 +165,59 @@ class GammaProcess(JumpProcess):
 
 
 class VarianceGammaProcess(JumpProcess):
-	def __init__(self, C, beta, theta, sigmasq, samps=1000, minT=0., maxT=1., jtimes=None, epochs=None):
+	def __init__(self, beta, mu, sigmasq, samps=1000, minT=0., maxT=1., jtimes=None, epochs=None):
 		JumpProcess.__init__(self, samps=samps, minT=minT, maxT=maxT, jtimes=jtimes, epochs=epochs)
 
-		self.W = GammaProcess(C, beta, samps=samps, minT=minT, maxT=maxT)
+		self.W = GammaProcess(1., beta, samps=samps, minT=minT, maxT=maxT)
 		self.W.generate()
 
 		# self.jtimes = self.generate_times()
 		self.jtimes = self.W.jtimes
 
-		self.theta = theta
+		self.mu = mu
 		self.sigmasq = sigmasq
 		self.sigma = np.sqrt(sigmasq)
+		self.beta = beta
+
+
+	# def generate(self):
+	# 	normal = np.random.randn(self.W.jsizes.shape[0]-1)
+	# 	self.jsizes = np.zeros(self.W.jsizes.shape[0])
+	# 	for i in range(1, self.W.jsizes.shape[0]):
+	# 		self.jsizes[i] = self.mu*self.W.jsizes[i-1]+self.sigma*np.sqrt(self.W.jsizes[i-1])*normal[i-1]
 
 
 	def generate(self):
-		normal = np.random.randn(self.W.jsizes.shape[0]-1)
-		self.jsizes = np.zeros(self.W.jsizes.shape[0])
-		for i in range(1, self.W.jsizes.shape[0]):
-			self.jsizes[i] = self.theta*self.W.jsizes[i-1]+self.sigma*np.sqrt(self.W.jsizes[i-1])*normal[i-1]
+		normal = np.random.randn(self.samps)
+		self.jsizes = (self.mu*self.W.jsizes) + (np.sqrt(self.sigmasq*self.W.jsizes) * normal)
+
+
+	def marginal_pdf(self, x, t):
+		term1 = 2*np.exp(self.mu*x/self.sigmasq)
+		term2 = np.power(self.beta, t/self.beta)*np.sqrt(2*np.pi*self.sigmasq)*gammaf(t/self.beta)
+		term3 = np.square(x)/(2*self.sigmasq/self.beta + self.mu**2)
+		term4 = (t/self.beta) - 0.5
+		term5 = (1./self.sigmasq) * np.sqrt(self.mu**2 + 2*self.sigmasq/self.beta)*np.abs(x)
+
+		return (term1/term2)*np.power(term3, term4/2.) * kv(term4, term5)		
+
+	def marginal_variancegamma(self, x, t, ax, label=''):
+		ax.plot(x-self.mu, self.marginal_pdf(x, t), label=label)
 
 
 class LangevinModel:
-	def __init__(self, muw, sigmasq, kv, theta, C, beta, nobservations):
+	def __init__(self, mu, sigmasq, beta, kv, theta, nobservations):
 		self.theta = theta
 		self.nobservations = nobservations
 		self.observationtimes = np.cumsum(np.random.exponential(scale=.1, size=nobservations))
 		self.observationvals = []
+		self.lastobservation = 0.
 		# initial state
-		self.state = np.array([0, 0, muw])
+		self.state = np.array([0, 0, mu])
 		self.beta = beta
-		self.C = C
 		self.kv = kv
 		self.sigmasq = sigmasq
-		self.muw = muw
+		self.muw = mu
 
 		self.Bmat = self.B_matrix()
 		self.Hmat = self.H_matrix()
@@ -220,8 +246,10 @@ class LangevinModel:
 
 
 	def increment_process(self):
-		Z = GammaProcess(self.C, self.beta, samps=1000, minT=self.s, maxT=self.t)
+		Z = GammaProcess(1., self.beta, samps=1000, minT=self.s, maxT=self.t)
 		Z.generate()
+		# m = self.lastobservation*Z.langevin_m(self.t, self.theta).reshape(-1, 1)
+		# S = (self.lastobservation**2)*self.sigmasq*Z.langevin_S(self.t, self.theta)
 		m = Z.langevin_m(self.t, self.theta).reshape(-1, 1)
 		S = self.sigmasq*Z.langevin_S(self.t, self.theta)
 		Sc = np.linalg.cholesky(S + 1e-12*np.eye(2))
@@ -229,7 +257,8 @@ class LangevinModel:
 		e = Sc @ np.random.randn(2)
 		self.state = Amat @ self.state + self.Bmat @ e
 		new_observation = self.Hmat @ self.state + np.sqrt(self.sigmasq*self.kv)*np.random.randn()
-		self.observationvals.append(new_observation[0])
+		lastobservation = new_observation[0]
+		self.observationvals.append(lastobservation)
 		
 	
 	def forward_simulate(self):
