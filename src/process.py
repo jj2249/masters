@@ -168,7 +168,7 @@ class VarianceGammaProcess(JumpProcess):
 	def __init__(self, beta, mu, sigmasq, samps=1000, minT=0., maxT=1., jtimes=None, epochs=None):
 		JumpProcess.__init__(self, samps=samps, minT=minT, maxT=maxT, jtimes=jtimes, epochs=epochs)
 
-		self.W = GammaProcess(1., beta, samps=samps, minT=minT, maxT=maxT)
+		self.W = GammaProcess(1, beta, samps=samps, minT=minT, maxT=maxT)
 		self.W.generate()
 
 		# self.jtimes = self.generate_times()
@@ -195,14 +195,14 @@ class VarianceGammaProcess(JumpProcess):
 	def marginal_pdf(self, x, t):
 		term1 = 2*np.exp(self.mu*x/self.sigmasq)
 		term2 = np.power(self.beta, t/self.beta)*np.sqrt(2*np.pi*self.sigmasq)*gammaf(t/self.beta)
-		term3 = np.square(x)/(2*self.sigmasq/self.beta + self.mu**2)
+		term3 = np.abs(x)/np.sqrt(2*self.sigmasq/self.beta + self.mu**2)
 		term4 = (t/self.beta) - 0.5
-		term5 = (1./self.sigmasq) * np.sqrt(self.mu**2 + 2*self.sigmasq/self.beta)*np.abs(x)
+		term5 = (1./self.sigmasq) * np.sqrt(self.mu**2 + (2*self.sigmasq/self.beta))*np.abs(x)
 
-		return (term1/term2)*np.power(term3, term4/2.) * kv(term4, term5)		
+		return (term1/term2)*np.power(term3, term4) * kv(term4, term5)		
 
 	def marginal_variancegamma(self, x, t, ax, label=''):
-		ax.plot(x-self.mu, self.marginal_pdf(x, t), label=label)
+		ax.plot(x, self.marginal_pdf(x, t), label=label)
 
 
 class LangevinModel:
@@ -211,6 +211,7 @@ class LangevinModel:
 		self.nobservations = nobservations
 		self.observationtimes = np.cumsum(np.random.exponential(scale=.1, size=nobservations))
 		self.observationvals = []
+		self.observationgrad = []
 		self.lastobservation = 0.
 		# initial state
 		self.state = np.array([0, 0, mu])
@@ -259,6 +260,7 @@ class LangevinModel:
 		new_observation = self.Hmat @ self.state + np.sqrt(self.sigmasq*self.kv)*np.random.randn()
 		lastobservation = new_observation[0]
 		self.observationvals.append(lastobservation)
+		self.observationgrad.append(self.state[1])
 		
 	
 	def forward_simulate(self):
