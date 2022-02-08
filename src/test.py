@@ -22,7 +22,7 @@ lss.forward_simulate()
 
 sampled_dic = {'Date_Time': lss.observationtimes, 'Price': lss.observationvals}
 sampled_data = pd.DataFrame(data=sampled_dic)
-rbpf = RBPF(P=2, mumu=0., sigmasq=1., beta=0.1, kw=1e6, kv=.1, theta=-0.5, data=sampled_data, N=N, gsamps=500)
+rbpf = RBPF(P=2, mumu=0., sigmasq=1., beta=0.1, kw=1e6, kv=.1, theta=-0.5, data=sampled_data, N=N, gsamps=500, epsilon=0.2)
 
 ### --- importing data --- ### 
 # data = TimeseriesData(os.pardir+"/resources/data/test_data.csv")
@@ -43,6 +43,8 @@ state_means = []
 state_variances = []
 # particle_vals = []
 # times = []
+iters = 0
+no_resamples = 0
 for _ in tqdm(range(len(sampled_data)-1)):
 	rbpf.increment_particles()
 	rbpf.reweight_particles()
@@ -52,7 +54,12 @@ for _ in tqdm(range(len(sampled_data)-1)):
 	# for particle in rbpf.particles:
 		# particle_vals.append(particle.acc[0][0])
 		# times.append(rbpf.current_time)
-	rbpf.resample_particles()
+	# if rbpf.get_logPn2() < rbpf.log_resample_limit:
+	if rbpf.get_logDninf() < rbpf.log_resample_limit:
+		rbpf.resample_particles()
+		no_resamples += 1
+	iters += 1
+print("resample rate: " + str(no_resamples/iters))
 
 # ax.hexbin(times, particle_vals, cmap='viridis', bins=(T-2, 100))
 # plt.show()

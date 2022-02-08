@@ -73,7 +73,7 @@ class Particle:
 		# S = (self.lastobservation**2)*self.sigmasq*Z.langevin_S(t, self.theta)
 		m = Z.langevin_m(t, self.theta)
 		S = self.sigmasq*Z.langevin_S(t, self.theta)
-		# come back to this if there a stability issues
+		# come back to this if there are stability issues
 		Sc = np.linalg.cholesky(S+1e-12*np.eye(self.P))
 		e = Sc @ np.random.randn(self.P)
 
@@ -99,7 +99,7 @@ class Particle:
 
 
 class RBPF:
-	def __init__(self, P, mumu, sigmasq, beta, kw, kv, theta, data, N, gsamps):
+	def __init__(self, P, mumu, sigmasq, beta, kw, kv, theta, data, N, gsamps, epsilon):
 
 		self.times = data['Date_Time']
 		self.prices = data['Price']
@@ -118,6 +118,7 @@ class RBPF:
 		self.current_price = self.pricegen.__next__()
 
 		self.N = N
+		self.log_resample_limit = np.log(self.N*epsilon)
 		self.particles = [Particle(P, mumu, sigmasq, beta, kw, kv, theta, gsamps) for _ in range(N)]
 		
 
@@ -172,3 +173,14 @@ class RBPF:
 		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
 		covs = np.array([particle.Ccc for particle in self.particles])
 		return np.sum(weights*covs, axis=0)
+
+
+	def get_logPn2(self):
+		lweights = np.array([particle.logweight for particle in self.particles])
+		return -np.log(np.sum(np.exp(2*lweights)))
+
+
+	def get_logDninf(self):
+		lweights = np.array([particle.logweight for particle in self.particles])
+		return -np.max(lweights)
+
