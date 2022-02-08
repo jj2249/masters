@@ -8,11 +8,12 @@ def logsumexp(x):
 	return c + np.log(np.sum(np.exp(x-c)))
 
 class Particle:
-	def __init__(self, P, mumu, sigmasq, beta, kw, kv, theta):
+	def __init__(self, P, mumu, sigmasq, beta, kw, kv, theta, gsamps):
 		self.theta = theta
 		self.P = P
 		self.kv = kv
 		self.beta = beta
+		self.gsamps = gsamps
 
 		# initial kalman parameters
 		# a current current
@@ -65,7 +66,7 @@ class Particle:
 		if type(t) == pd._libs.tslibs.timedeltas.Timedelta:
 				t = t.total_seconds()
 		dt = t - s
-		Z = GammaProcess(1., self.beta, samps=1000, minT=s, maxT=t)
+		Z = GammaProcess(1., self.beta, samps=self.gsamps, minT=s, maxT=t)
 		Z.generate()
 
 		# m = self.lastobservation*Z.langevin_m(t, self.theta)
@@ -98,7 +99,7 @@ class Particle:
 
 
 class RBPF:
-	def __init__(self, P, mumu, sigmasq, beta, kw, kv, theta, data, N):
+	def __init__(self, P, mumu, sigmasq, beta, kw, kv, theta, data, N, gsamps):
 
 		self.times = data['Date_Time']
 		self.prices = data['Price']
@@ -117,7 +118,7 @@ class RBPF:
 		self.current_price = self.pricegen.__next__()
 
 		self.N = N
-		self.particles = [Particle(P, mumu, sigmasq, beta, kw, kv, theta) for _ in range(N)]
+		self.particles = [Particle(P, mumu, sigmasq, beta, kw, kv, theta, gsamps) for _ in range(N)]
 		
 
 	def reweight_particles(self):

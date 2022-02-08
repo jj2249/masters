@@ -129,15 +129,12 @@ class GammaProcess(JumpProcess):
 
 
 	def generate(self):
-		# old_settings = 
 		self.epochs = self.generate_epochs()
 		xs = 1./(self.B*(np.exp(self.epochs/self.C)-1))
 		ps = (1+self.B*xs)*np.exp(-self.B*xs)
 		self.jsizes = self.accept_samples(xs, ps)
 		self.jtimes = self.generate_times(acc_samps=self.jsizes.shape[0])
 		self.sort_jumps()
-		# print(list(zip(self.jtimes, self.jsizes)))
-
 
 
 	# def construct_timeseries(self):
@@ -187,11 +184,15 @@ class GammaProcess(JumpProcess):
 
 
 class VarianceGammaProcess(JumpProcess):
-	def __init__(self, beta, mu, sigmasq, samps=1000, minT=0., maxT=1., jtimes=None, epochs=None):
-		JumpProcess.__init__(self, samps=samps, minT=minT, maxT=maxT, jtimes=jtimes, epochs=epochs)
+	def __init__(self, beta, mu, sigmasq, gsamps=500, minT=0., maxT=1., jtimes=None, epochs=None):
 
-		self.W = GammaProcess(1, beta, samps=samps, minT=minT, maxT=maxT)
+		# defined in terms of alpha (mu), beta (nu) parameterisation
+		self.W = GammaProcess(1, beta, samps=gsamps, minT=minT, maxT=maxT)
 		self.W.generate()
+
+		self.samps = self.W.jtimes.shape[0]
+
+		JumpProcess.__init__(self, samps=self.samps, minT=minT, maxT=maxT, jtimes=jtimes, epochs=epochs)
 
 		# self.jtimes = self.generate_times()
 		self.jtimes = self.W.jtimes
@@ -228,9 +229,10 @@ class VarianceGammaProcess(JumpProcess):
 
 
 class LangevinModel:
-	def __init__(self, mu, sigmasq, beta, kv, theta, nobservations):
+	def __init__(self, mu, sigmasq, beta, kv, theta, nobservations, gsamps):
 		self.theta = theta
 		self.nobservations = nobservations
+		self.gsamps = gsamps
 		self.observationtimes = np.cumsum(np.random.exponential(scale=.1, size=nobservations))
 		self.observationvals = []
 		self.observationgrad = []
@@ -269,7 +271,7 @@ class LangevinModel:
 
 
 	def increment_process(self):
-		Z = GammaProcess(1., self.beta, samps=1000, minT=self.s, maxT=self.t)
+		Z = GammaProcess(1., self.beta, samps=self.gsamps, minT=self.s, maxT=self.t)
 		Z.generate()
 		# m = self.lastobservation*Z.langevin_m(self.t, self.theta).reshape(-1, 1)
 		# S = (self.lastobservation**2)*self.sigmasq*Z.langevin_S(self.t, self.theta)

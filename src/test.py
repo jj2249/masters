@@ -14,7 +14,7 @@ T = 100
 
 # fig = plt.figure()
 # ax = fig.add_subplot()
-lss = LangevinModel(mu=0., sigmasq=1., beta=0.1, kv=0.1, theta=-0.5, nobservations=100)
+lss = LangevinModel(mu=0., sigmasq=1., beta=0.1, kv=0.1, theta=-0.5, nobservations=100, gsamps=500)
 lss.forward_simulate()
 # ax.plot(lss.observationtimes, lss.observationvals)
 # ax.set_xticks([])
@@ -22,7 +22,7 @@ lss.forward_simulate()
 
 sampled_dic = {'Date_Time': lss.observationtimes, 'Price': lss.observationvals}
 sampled_data = pd.DataFrame(data=sampled_dic)
-rbpf = RBPF(P=2, mumu=0., sigmasq=1., beta=0.1, kw=1e6, kv=.1, theta=-0.5, data=sampled_data, N=N)
+rbpf = RBPF(P=2, mumu=0., sigmasq=1., beta=0.1, kw=1e6, kv=.1, theta=-0.5, data=sampled_data, N=N, gsamps=500)
 
 ### --- importing data --- ### 
 # data = TimeseriesData(os.pardir+"/resources/data/test_data.csv")
