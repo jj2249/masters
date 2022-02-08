@@ -14,30 +14,8 @@ class Process:
 		self.maxT = maxT
 
 class JumpProcess(Process):
-	def __init__(self, samps=1000, minT=0., maxT=1., jtimes=None, epochs=None):
+	def __init__(self, samps=1000, minT=0., maxT=1.):
 		Process.__init__(self, samps=samps, minT=minT, maxT=maxT)
-		
-		# latent parameters
-		if jtimes == None:
-			self.jtimes = self.generate_times()
-		else:
-			self.jtimes = jtimes
-		if epochs == None:
-			self.epochs = self.generate_epochs()
-		else:
-			self.epochs = epochs
-
-		# jump sizes determined by epochs
-		self.jsizes = None
-
-	
-	def generate_epochs(self):
-		"""
-		Poisson epochs control the jump sizes
-		"""
-		# sum of exponential random variables
-		times = np.random.exponential(scale=1., size=self.samps)
-		return np.cumsum(times)
 
 	
 	def generate_times(self, acc_samps=None):
@@ -115,6 +93,7 @@ class GammaProcess(JumpProcess):
 		self.alpha = alpha
 		self.beta = beta
 		# self.jtimes = self.generate_times()
+		self.epochs = self.generate_epochs()
 
 
 	# def generate_times(self):
@@ -127,6 +106,15 @@ class GammaProcess(JumpProcess):
 	# 	jumps = gamma.rvs(a=dt*self.alpha**2/self.beta, loc=0, scale=self.beta/self.alpha, size=self.samps)
 	# 	self.jsizes = jumps
 
+	
+	def generate_epochs(self):
+		"""
+		Poisson epochs control the jump sizes
+		"""
+		# sum of exponential random variables
+		times = np.random.exponential(scale=self.rate, size=self.samps)
+		return np.cumsum(times)
+	
 
 	def generate(self):
 		self.epochs = self.generate_epochs()

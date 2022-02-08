@@ -22,7 +22,7 @@ lss.forward_simulate()
 
 sampled_dic = {'Date_Time': lss.observationtimes, 'Price': lss.observationvals}
 sampled_data = pd.DataFrame(data=sampled_dic)
-rbpf = RBPF(P=2, mumu=0., sigmasq=1., beta=0.1, kw=1e6, kv=.1, theta=-0.5, data=sampled_data, N=N, gsamps=500, epsilon=0.2)
+rbpf = RBPF(P=2, mumu=0., sigmasq=1., beta=0.1, kw=1e6, kv=.1, theta=-0.5, data=sampled_data, N=N, gsamps=5000, epsilon=0.8)
 
 ### --- importing data --- ### 
 # data = TimeseriesData(os.pardir+"/resources/data/test_data.csv")
