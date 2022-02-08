@@ -57,11 +57,12 @@ class JumpProcess(Process):
 		"""
 		# random samples to decide acceptance
 		uniform = np.random.rand(values.shape[0])
+		# print(list(zip(probabilites, uniform)))
 		# accept if the probability is higher than the generated value
-		accepted_values = np.where(probabilites>values, values, 0)
-
-		# return accepted_values[accepted_values>0.]
-		return accepted_values
+		accepted_values = np.where(probabilites>uniform, values, 0.)
+		# print(accepted_values)
+		return accepted_values[accepted_values>0.]
+		# return accepted_values
 
 
 	def sort_jumps(self):
@@ -109,9 +110,11 @@ class JumpProcess(Process):
 class GammaProcess(JumpProcess):
 	def __init__(self, alpha, beta, samps=1000, minT=0., maxT=1.):
 		JumpProcess.__init__(self, samps=samps, minT=minT, maxT=maxT)
+		self.C = alpha**2/beta
+		self.B = alpha/beta
 		self.alpha = alpha
 		self.beta = beta
-		self.jtimes = self.generate_times()
+		# self.jtimes = self.generate_times()
 
 
 	# def generate_times(self):
@@ -122,17 +125,19 @@ class GammaProcess(JumpProcess):
 	# def generate(self):
 	# 	dt = self.jtimes[1]-self.jtimes[0]
 	# 	jumps = gamma.rvs(a=dt*self.alpha**2/self.beta, loc=0, scale=self.beta/self.alpha, size=self.samps)
-		# self.jsizes = jumps
+	# 	self.jsizes = jumps
 
 
 	def generate(self):
 		# old_settings = 
 		self.epochs = self.generate_epochs()
-		xs = 1./(self.beta*(np.exp(self.epochs/self.alpha)-1))
-		ps = (1+self.beta*xs)*np.exp(-self.beta*xs)
+		xs = 1./(self.B*(np.exp(self.epochs/self.C)-1))
+		ps = (1+self.B*xs)*np.exp(-self.B*xs)
 		self.jsizes = self.accept_samples(xs, ps)
-		self.generate_times(acc_samps=self.jsizes.shape[0])
+		self.jtimes = self.generate_times(acc_samps=self.jsizes.shape[0])
 		self.sort_jumps()
+		# print(list(zip(self.jtimes, self.jsizes)))
+
 
 
 	# def construct_timeseries(self):

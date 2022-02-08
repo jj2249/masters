@@ -19,14 +19,15 @@ ax3 = fig.add_subplot(2,1,2)
 final_vals = []
 
 # # for nu in [1., .1, .01]:
-for i in range(1000):
-	g = GammaProcess(1., beta, samps=1000, minT=0., maxT=1.)
+for i in tqdm(range(2000)):
+	g = GammaProcess(1., beta, samps=500, minT=0., maxT=1.)
 	g.generate()
 	# g.plot_timeseries(ax1, samples=1000)#, label='nu: '+str(nu))
 	g.plot_timeseries(ax1)#, label='nu: '+str(nu))
 	final_vals.append(np.sum(g.jsizes))
 
-y = np.linspace(0., np.max(final_vals), 1000)
+# y = np.linspace(0., np.max(final_vals), 1000)
+y = np.linspace(0., 5., 1000)
 ax2.hist(final_vals, bins=50, density=True, cumulative=False, orientation='horizontal')
 g.marginal_gamma(y, 1., ax2)
 ax3.hist(final_vals, bins=50, density=True, cumulative=True, orientation='vertical')
@@ -39,8 +40,8 @@ ax1.set_xlabel('t')
 ax1.set_ylabel('Gt')
 ax2.set_xlabel('frequency')
 ax2.set_ylabel('G1')
-ax3.set_xlabel('frequency')
-ax3.set_ylabel('G1')
+ax3.set_ylabel('frequency')
+ax3.set_xlabel('G1')
 plt.show()
 
 
