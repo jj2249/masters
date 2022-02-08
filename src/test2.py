@@ -9,38 +9,39 @@ from particlefilter import RBPF
 from ksdensity import ksdensity
 
 # alpha = 1.
-# beta = .1
+beta = .01
 # maxT = 1.
-# fig = plt.figure()
-# ax1 = fig.add_subplot(2,2,1)
+fig = plt.figure()
+ax1 = fig.add_subplot(2,2,1)
 # # ax = fig.add_subplot()
-# ax2 = fig.add_subplot(2,2,2)
-# ax3 = fig.add_subplot(2,1,2)
-# final_vals = []
+ax2 = fig.add_subplot(2,2,2)
+ax3 = fig.add_subplot(2,1,2)
+final_vals = []
 
 # # for nu in [1., .1, .01]:
-# for i in range(10000):
-# 	g = GammaProcess(alpha, beta, samps=1000, minT=0., maxT=1.)
-# 	g.generate()
-# 	g.plot_timeseries(ax1)#, label='nu: '+str(nu))
-# 	final_vals.append(np.sum(g.jsizes))
+for i in range(1000):
+	g = GammaProcess(1., beta, samps=1000, minT=0., maxT=1.)
+	g.generate()
+	# g.plot_timeseries(ax1, samples=1000)#, label='nu: '+str(nu))
+	g.plot_timeseries(ax1)#, label='nu: '+str(nu))
+	final_vals.append(np.sum(g.jsizes))
 
-# y = np.linspace(0., np.max(final_vals), 1000)
-# ax2.hist(final_vals, bins=50, density=True, cumulative=False, orientation='horizontal')
-# g.marginal_gamma(y, 1., ax2)
-# ax3.hist(final_vals, bins=50, density=True, cumulative=True, orientation='vertical')
-# g.marginal_gamma_cdf(y, 1., ax3)
-# ax1.set_title('Skeleton Processes')
-# ax2.set_title('Marginal PDF')
-# ax3.set_title('Marginal CDF')
-# # fig.legend()
-# ax1.set_xlabel('t')
-# ax1.set_ylabel('Gt')
-# ax2.set_xlabel('frequency')
-# ax2.set_ylabel('G1')
-# ax3.set_xlabel('frequency')
-# ax3.set_ylabel('G1')
-# plt.show()
+y = np.linspace(0., np.max(final_vals), 1000)
+ax2.hist(final_vals, bins=50, density=True, cumulative=False, orientation='horizontal')
+g.marginal_gamma(y, 1., ax2)
+ax3.hist(final_vals, bins=50, density=True, cumulative=True, orientation='vertical')
+g.marginal_gamma_cdf(y, 1., ax3)
+ax1.set_title('Skeleton Processes')
+ax2.set_title('Marginal PDF')
+ax3.set_title('Marginal CDF')
+fig.legend()
+ax1.set_xlabel('t')
+ax1.set_ylabel('Gt')
+ax2.set_xlabel('frequency')
+ax2.set_ylabel('G1')
+ax3.set_xlabel('frequency')
+ax3.set_ylabel('G1')
+plt.show()
 
 
 # fig = plt.figure()
@@ -75,14 +76,14 @@ from ksdensity import ksdensity
 	# ks_density = ksdensity(final_vals, width=0.3)
 	# ax2.plot(y, ks_density(y))
 	# vg.marginal_variancegamma(y, 1., ax2, label='mu: '+str(round(mu, 2)))
-	vg.marginal_variancegamma(y, 1., ax2, label='beta: '+str(round(beta, 2)))
+	# vg.marginal_variancegamma(y, 1., ax2, label='beta: '+str(round(beta, 2)))
 	# vg.marginal_variancegamma(y, 1., ax2, label='sigmasq: '+str(round(sigma, 2)))
 
 
-ax2.set_xlabel('VG1')
-ax2.set_ylabel('frequency')
-fig.legend()
-plt.show()
+# ax2.set_xlabel('VG1')
+# ax2.set_ylabel('frequency')
+# fig.legend()
+# plt.show()
 
 # fig = plt.figure()
 # ax1 = fig.add_subplot(121)
