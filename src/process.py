@@ -36,7 +36,7 @@ class JumpProcess(Process):
 		Poisson epochs control the jump sizes
 		"""
 		# sum of exponential random variables
-		times = np.random.exponential(scale=self.rate, size=self.samps)
+		times = np.random.exponential(scale=1., size=self.samps)
 		return np.cumsum(times)
 
 	
@@ -75,34 +75,33 @@ class JumpProcess(Process):
 		self.jsizes = np.take(self.jsizes, idx)
 
 		
+	def construct_timeseries(self, samples):
+		"""
+		Construct a skeleton process on a uniform discrete time axis
+		"""
+		axis = np.linspace(self.minT, self.maxT, samples)
+		cumulative_jumps = np.cumsum(self.jsizes)
+		timeseries = np.zeros(samples)
+
+		for i in range(1, samples):
+			occured_jumps = self.jtimes[self.jtimes<axis[i]]
+			if occured_jumps.size == 0:
+				timeseries[i] = 0
+			else:
+				jump_idx = np.argmax(occured_jumps)
+				timeseries[i] = cumulative_jumps[jump_idx]
+		return axis, timeseries
+
 
 	# def construct_timeseries(self):
-	# 	"""
-	# 	Construct a skeleton process on a uniform discrete time axis
-	# 	"""
-	# 	axis = np.linspace(self.minT, self.maxT, self.samps)
-	# 	cumulative_jumps = np.cumsum(self.jsizes)
-	# 	timeseries = np.zeros(self.samps)
-
-	# 	for i in range(1, self.samps):
-	# 		occured_jumps = self.jtimes[self.jtimes<axis[i]]
-	# 		if occured_jumps.size == 0:
-	# 			timeseries[i] = 0
-	# 		else:
-	# 			jump_idx = np.argmax(occured_jumps)
-	# 			timeseries[i] = cumulative_jumps[jump_idx]
-	# 	return axis, timeseries
+	# 	return self.jtimes, np.cumsum(self.jsizes)
 
 
-	def construct_timeseries(self):
-		return self.jtimes, np.cumsum(self.jsizes)
-
-
-	def plot_timeseries(self, ax, label=''):
+	def plot_timeseries(self, ax, samples=1000, label=''):
 		"""
 		Plot the process skeleton
 		"""
-		t, f = self.construct_timeseries()
+		t, f = self.construct_timeseries(samples=samples)
 		ax.step(t, f, label=label)
 		return ax
 
@@ -115,19 +114,37 @@ class GammaProcess(JumpProcess):
 		self.jtimes = self.generate_times()
 
 
-	def generate_times(self):
-		jtimes = np.linspace(self.minT, self.maxT, self.samps)
-		return jtimes
+	# def generate_times(self):
+	# 	jtimes = np.linspace(self.minT, self.maxT, self.samps)
+	# 	return jtimes
+
+
+	# def generate(self):
+	# 	dt = self.jtimes[1]-self.jtimes[0]
+	# 	jumps = gamma.rvs(a=dt*self.alpha**2/self.beta, loc=0, scale=self.beta/self.alpha, size=self.samps)
+		# self.jsizes = jumps
 
 
 	def generate(self):
-		dt = self.jtimes[1]-self.jtimes[0]
-		jumps = gamma.rvs(a=dt*self.alpha**2/self.beta, loc=0, scale=self.beta/self.alpha, size=self.samps)
-		self.jsizes = jumps
+		# old_settings = 
+		self.epochs = self.generate_epochs()
+		xs = 1./(self.beta*(np.exp(self.epochs/self.alpha)-1))
+		ps = (1+self.beta*xs)*np.exp(-self.beta*xs)
+		self.jsizes = self.accept_samples(xs, ps)
+		self.generate_times(acc_samps=self.jsizes.shape[0])
+		self.sort_jumps()
 
 
-	def construct_timeseries(self):
-		return self.jtimes, np.cumsum(self.jsizes)
+	# def construct_timeseries(self):
+	# 	return self.jtimes, np.cumsum(self.jsizes)
+
+	# def plot_timeseries(self, ax, label=''):
+	# 	"""
+	# 	Plot the process skeleton
+	# 	"""
+	# 	t, f = self.construct_timeseries()
+	# 	ax.step(t, f, label=label)
+	# 	return ax
 
 
 	def marginal_gamma(self, x, t, ax, label=''):
