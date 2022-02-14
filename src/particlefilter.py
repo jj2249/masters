@@ -51,12 +51,7 @@ class LangevinParticle(LangevinModel):
 			)
 
 
-	def increment(self, observation, s, t):
-		if type(s) == pd._libs.tslibs.timedeltas.Timedelta:
-				s = s.total_seconds()
-		if type(t) == pd._libs.tslibs.timedeltas.Timedelta:
-				t = t.total_seconds()
-
+	def predict(self, s, t):
 		# time interval between two observations
 		dt = t - s
 
@@ -72,7 +67,7 @@ class LangevinParticle(LangevinModel):
 		e = Sc @ np.random.randn(2)
 
 		Amat = self.A_matrix(m, dt)
-		# print(Amat.shape)
+
 		# state increment
 		self.alpha = (Amat @ self.alpha) + (self.Bmat @ e)
 
@@ -80,22 +75,45 @@ class LangevinParticle(LangevinModel):
 		acp = (Amat @ self.acc).reshape(-1, 1)
 		Ccp = (Amat @ self.Ccc @ Amat.T) + (self.Bmat @ S @ self.Bmat.T)
 
+		return acp, Ccp
+
+
+	def correct(self, observation, acp, Ccp):
 		# Kalman gain
 		K = (Ccp @ self.Hmat.T) / ((self.Hmat @ Ccp @ self.Hmat.T) + self.sigmasq*self.kv)
 		K = K.reshape(-1, 1)
 
 		# correction step
-		self.acc = acp + (K * (observation - self.Hmat @ acp))
-		self.Ccc = Ccp - (K @ self.Hmat @ Ccp)
+		acc = acp + (K * (observation - self.Hmat @ acp))
+		Ccc = Ccp - (K @ self.Hmat @ Ccp)
 
+		return acc, Ccc
+
+
+	def log_ped(self, observation, acp, Ccp):
 		# Prediction Error Decomposition
 		ayt = (self.Hmat @ acp)
 		Cyt = (self.Hmat @ Ccp @ self.Hmat.T) + (self.sigmasq*self.kv)
 		Cyt = Cyt.flatten()
 
 		# update log weight
-		# print(observation-ayt)
-		self.logweight += -0.5 * np.log(2.*np.pi*Cyt) - (1./(2.*Cyt))*np.square(observation-ayt)
+		return -0.5 * np.log(2.*np.pi*Cyt) - (1./(2.*Cyt))*np.square(observation-ayt)
+
+
+	def increment(self, observation, s, t):
+		if type(s) == pd._libs.tslibs.timedeltas.Timedelta:
+				s = s.total_seconds()
+		if type(t) == pd._libs.tslibs.timedeltas.Timedelta:
+				t = t.total_seconds()
+
+		# kalman prediction step
+		acp, Ccp = self.predict(s, t)
+
+		# kalman correction step
+		self.acc, self.Ccc = self.correct(observation, acp, Ccp)
+
+		# log prediction error decomposition to update particle weight
+		self.logweight += self.log_ped(observation, acp, Ccp)
 
 
 

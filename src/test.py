@@ -11,8 +11,14 @@ from particlefilter import RBPF
 ### --- Forward Simulation --- ###
 
 
-# lss = LangevinModel(mu=0., sigmasq=1., beta=0.1, kv=0.05, theta=-0.8, gsamps=10_000)
-# lss.generate(nobservations=500)
+lss = LangevinModel(mu=0., sigmasq=1., beta=0.8, kv=0.05, theta=-0.8, gsamps=10_000)
+lss.generate(nobservations=150)
+
+
+## - store data in a dataframe - ##
+
+sampled_dic = {'Date_Time': lss.observationtimes, 'Price': lss.observationvals}
+sampled_data = pd.DataFrame(data=sampled_dic)
 
 
 ## - option to plot simulated data - ##
@@ -22,13 +28,6 @@ from particlefilter import RBPF
 # ax.plot(lss.observationtimes, lss.observationvals)
 # ax.set_xticks([])
 # plt.show()
-
-
-## - store data in a dataframe - ##
-
-# sampled_dic = {'Date_Time': lss.observationtimes, 'Price': lss.observationvals}
-# sampled_data = pd.DataFrame(data=sampled_dic)
-
 
 
 
@@ -50,7 +49,7 @@ from particlefilter import RBPF
 
 ## - define particle filter - ##
 
-rbpf = RBPF(mumu=0., sigmasq=1., beta=0.1, kw=1e6, kv=.1, theta=-0.5, data=sampled_data, N=N, gsamps=5000, epsilon=0.8)
+rbpf = RBPF(mumu=0., sigmasq=1., beta=0.8, kw=1e6, kv=.05, theta=-0.8, data=sampled_data, N=1000, gsamps=5_000, epsilon=0.5)
 
 ## - containers for storing results of rbpf - ##
 fig = plt.figure()
