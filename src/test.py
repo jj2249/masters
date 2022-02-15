@@ -12,14 +12,12 @@ from particlefilter import RBPF
 
 
 lss = LangevinModel(mu=0., sigmasq=1., beta=0.8, kv=0.05, theta=-0.8, gsamps=10_000)
-lss.generate(nobservations=150)
+lss.generate(nobservations=200)
 
 
 ## - store data in a dataframe - ##
-
 sampled_dic = {'Date_Time': lss.observationtimes, 'Price': lss.observationvals}
 sampled_data = pd.DataFrame(data=sampled_dic)
-
 
 ## - option to plot simulated data - ##
 
@@ -49,30 +47,44 @@ sampled_data = pd.DataFrame(data=sampled_dic)
 
 ## - define particle filter - ##
 
-rbpf = RBPF(mumu=0., sigmasq=1., beta=0.8, kw=1e6, kv=.05, theta=-0.8, data=sampled_data, N=1000, gsamps=5_000, epsilon=0.5)
+# rbpf = RBPF(mumu=0., sigmasq=1., beta=0.8, kw=1e6, kv=.05, theta=-0.8, data=sampled_data, N=1_000, gsamps=10_000, epsilon=0.5)
+# ## - containers for storing results of rbpf - ##
+# fig = plt.figure()
+# ax1 = fig.add_subplot(211)
+# ax2 = fig.add_subplot(212)
 
-## - containers for storing results of rbpf - ##
+# ## - main loop of rbpf - ##
+# sm, sv, gm, gv, lml = rbpf.run_filter(ret_history=True)
+
+# ## - plotting results of rbpf - ##
+# ax1.plot(rbpf.times, lss.observationvals-lss.observationvals[0], label='true')
+# ax1.plot(rbpf.times, sm)
+# ax1.fill_between(rbpf.times, sm-1.96*np.sqrt(sv), sm+1.96*np.sqrt(sv), color='orange', alpha=0.3)
+
+# ax2.plot(rbpf.times, lss.observationgrad, label='true')
+# ax2.plot(rbpf.times, gm)
+# ax2.fill_between(rbpf.times, gm-1.96*np.sqrt(gv), gm+1.96*np.sqrt(gv), color='orange', alpha=0.3)
+
+
+# ax1.set_xticks([])
+# ax2.set_xticks([])
+# fig.legend()
+# plt.show()
+
+
+
+### --- Parameter Estimation --- ###
+thetas = np.linspace(-1.5, -0.1, 11)
+print(thetas)
+lmls = []
+for theta in tqdm(thetas):
+	rbpf = RBPF(mumu=0., sigmasq=1., beta=0.8, kw=1e6, kv=.05, theta=theta, data=sampled_data, N=1_000, gsamps=5_000, epsilon=0.5)
+	lml = rbpf.run_filter()
+	lmls.append(-1.*lml)
+
 fig = plt.figure()
 ax = fig.add_subplot()
-state_means = []
-state_variances = []
-
-
-## - main loop of rbpf - ##
-for _ in tqdm(range(len(sampled_data)-1)):
-	rbpf.increment_particles()
-	rbpf.reweight_particles()
-	state_means.append(rbpf.get_state_mean()[0][0])
-	state_variances.append(rbpf.get_state_covariance()[0,0])
-	if rbpf.get_logDninf() < rbpf.log_resample_limit:
-		rbpf.resample_particles()
-
-
-## - plotting results of rbpf - ##
-ax.plot(lss.observationtimes, lss.observationvals, label='true')
-ax.plot(lss.observationtimes[:-1], state_means+rbpf.initial_price)
-ax.fill_between(lss.observationtimes[:-1], state_means+rbpf.initial_price-1.96*np.sqrt(state_variances), state_means+rbpf.initial_price+1.96*np.sqrt(state_variances), color='orange', alpha=0.3)
-
-ax.set_xticks([])
-fig.legend()
+ax.bar(thetas, lmls, width=0.05)
+ax.set_xlabel('theta')
+ax.set_ylabel('-lml')
 plt.show()

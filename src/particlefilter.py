@@ -2,6 +2,7 @@ import numpy as np
 import copy
 from process import GammaProcess, LangevinModel
 import pandas as pd
+from tqdm import tqdm
 
 
 def logsumexp(x):
@@ -126,6 +127,7 @@ class RBPF:
 		# x and y values for the timeseries
 		self.times = data['Date_Time']
 		self.prices = data['Price']
+		self.nobservations = self.times.shape[0]
 
 		# store initial values
 		self.initial_time = self.times[0]
@@ -147,6 +149,7 @@ class RBPF:
 		self.N = N
 		# limit for resampling based on effective sample size
 		self.log_resample_limit = np.log(self.N*epsilon)
+		self.log_marginal_likelihood = 0.
 
 		# collection of particles
 		self.particles = [LangevinParticle(mumu, sigmasq, beta, kw, kv, theta, gsamps) for _ in range(N)]
@@ -241,3 +244,37 @@ class RBPF:
 		lweights = np.array([particle.logweight for particle in self.particles])
 		return -np.max(lweights)
 
+
+	def get_log_predictive_likelihood(self):
+		lweights = np.array([particle.logweight for particle in self.particles])
+		return logsumexp(lweights)
+
+
+	def run_filter(self, ret_history=False):
+		if ret_history:
+			state_means = [0.]
+			state_variances = [0.]
+			grad_means = [0.]
+			grad_variances = [0.]
+
+		for _ in (range(self.nobservations-1)):
+			self.increment_particles()
+			# log marginal term added before reweighting (based on predictive weight)
+			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
+			self.reweight_particles()
+
+			if ret_history:
+				smean = self.get_state_mean()
+				svar = self.get_state_covariance()
+
+				state_means.append(smean[0, 0])
+				state_variances.append(svar[0, 0])
+				grad_means.append(smean[1, 0])
+				grad_variances.append(svar[1, 1])
+
+			if self.get_logDninf() < self.log_resample_limit:
+				self.resample_particles()
+		if ret_history:
+			return np.array(state_means), np.array(state_variances), np.array(grad_means), np.array(grad_variances), self.log_marginal_likelihood
+		else:
+			return self.log_marginal_likelihood

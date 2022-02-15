@@ -323,7 +323,6 @@ class LangevinModel:
 
 		# state increment
 		self.state = Amat @ self.state + self.Bmat @ e
-		# self.statehistory[:, idx+1] = self.state
 
 		# observation bits --- not final
 		new_observation = self.Hmat @ self.state + np.sqrt(self.sigmasq*self.kv)*np.random.randn()
@@ -336,9 +335,9 @@ class LangevinModel:
 		"""
 		Generate the realisation of the state vector through time -- needs tweaking to be a bit more useful in terms of output
 		"""
-		# example times for testing
-		self.observationtimes = np.cumsum(np.random.exponential(scale=.1, size=nobservations))
-		
+		# example times for testing - add one more time that will be truncated for ease
+		self.observationtimes = np.cumsum(np.random.exponential(scale=.1, size=nobservations+1))
+
 		# generator for passing through the observed times
 		self.tgen = (time for time in self.observationtimes)
 		# start at t=0
@@ -346,7 +345,7 @@ class LangevinModel:
 		self.t = self.tgen.__next__()
 
 
-		for i in range(nobservations-1):
+		for i in range(nobservations):
 				self.increment_process()
 				self.s = self.t
 				self.t = self.tgen.__next__()
