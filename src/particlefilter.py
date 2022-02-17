@@ -70,29 +70,29 @@ class LangevinParticle(LangevinModel):
 		Amat = self.A_matrix(m, dt)
 		# print(Amat)
 		# prediction step
-		acp = (Amat @ self.acc).reshape(-1, 1)
-		Ccp = (Amat @ self.Ccc @ Amat.T) + (self.Bmat @ S @ self.Bmat.T)
-
-		return acp, Ccp
+		self.acp = (Amat @ self.acc).reshape(-1, 1)
+		self.Ccp = (Amat @ self.Ccc @ Amat.T) + (self.Bmat @ S @ self.Bmat.T)
 
 
-	def correct(self, observation, acp, Ccp):
+	def correct(self, observation):
 		# Kalman gain
 		# K = (Ccp @ self.Hmat.T) / ((self.Hmat @ Ccp @ self.Hmat.T) + self.sigmasq*self.kv)
-		K = (Ccp @ self.Hmat.T) / ((self.Hmat @ Ccp @ self.Hmat.T) + self.kv)
+		K = (self.Ccp @ self.Hmat.T) / ((self.Hmat @ self.Ccp @ self.Hmat.T) + self.kv)
 		K = K.reshape(-1, 1)
 
 		# correction step
-		acc = acp + (K * (observation - self.Hmat @ acp))
-		Ccc = Ccp - (K @ self.Hmat @ Ccp)
-		return acc, Ccc
+		self.acc = self.acp + (K * (observation - self.Hmat @ self.acp))
+		self.Ccc = self.Ccp - (K @ self.Hmat @ self.Ccp)
 
+		# log prediction error decomposition to update particle weight
+		self.logweight += self.log_ped(observation)
+		
 
-	def log_ped(self, observation, acp, Ccp):
+	def log_ped(self, observation):
 		# Prediction Error Decomposition
-		ayt = (self.Hmat @ acp)
+		ayt = (self.Hmat @ self.acp)
 		# Cyt = (self.Hmat @ Ccp @ self.Hmat.T) + (self.sigmasq*self.kv)
-		Cyt = (self.Hmat @ Ccp @ self.Hmat.T) + (self.kv)
+		Cyt = (self.Hmat @ self.Ccp @ self.Hmat.T) + (self.kv)
 		Cyt = Cyt.flatten()
 
 		# update log weight
@@ -106,13 +106,10 @@ class LangevinParticle(LangevinModel):
 				t = t.total_seconds()
 
 		# kalman prediction step
-		acp, Ccp = self.predict(s, t)
+		self.predict(s, t)
 
 		# kalman correction step
-		self.acc, self.Ccc = self.correct(observation, acp, Ccp)
-
-		# log prediction error decomposition to update particle weight
-		self.logweight += self.log_ped(observation, acp, Ccp)
+		self.correct(observation)
 
 
 
@@ -139,9 +136,10 @@ class RBPF:
 		self.timegen = iter(self.times)
 		self.pricegen = iter(self.prices)
 
+		self.prev_time = 0.
+		self.prev_price = 0.
 		self.current_time = next(self.timegen)
 		self.current_price = next(self.pricegen)
-
 		# implementation parameters
 		# no. of particles
 		self.N = N
@@ -164,19 +162,23 @@ class RBPF:
 			# log domain
 			particle.logweight = particle.logweight - sum_weights
 
+	
+	def observe(self):
+		# collect new times and prices
+		self.prev_price = self.current_price
+		self.current_price = next(self.pricegen)
+		self.prev_time = self.current_time
+		self.current_time = next(self.timegen)
+
 
 	def increment_particles(self):
 		"""
 		Increment each particle based on the newest time and observation
 		"""
-		# collect new times and prices
-		self.current_price = next(self.pricegen)
-		prev_time = self.current_time
-		self.current_time = next(self.timegen)
-
 		# reweight each particle -- could be faster using a map()?
+		self.observe()
 		for particle in self.particles:
-			particle.increment(self.current_price, prev_time, self.current_time)
+			particle.increment(self.current_price, self.prev_time, self.current_time)
 
 
 	def resample_particles(self):
@@ -217,12 +219,30 @@ class RBPF:
 		return np.sum(weights*means, axis=0)
 
 
+	def get_state_mean_pred(self):
+		"""
+		Get weighted sum of current particle means
+		"""
+		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
+		means = np.array([particle.acp for particle in self.particles])
+		return np.sum(weights*means, axis=0)
+
+
 	def get_state_covariance(self):
 		"""
 		Get weighted sum of current particle variances
 		"""
 		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
 		covs = np.array([particle.Ccc for particle in self.particles])
+		return np.sum(weights*covs, axis=0)
+
+
+	def get_state_covariance_pred(self):
+		"""
+		Get weighted sum of current particle variances
+		"""
+		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
+		covs = np.array([particle.Ccp for particle in self.particles])
 		return np.sum(weights*covs, axis=0)
 
 
