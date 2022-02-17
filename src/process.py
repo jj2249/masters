@@ -301,7 +301,7 @@ class LangevinModel:
 		vec1 = np.exp(theta*(t - W.jtimes))
 		vec2 = np.square(vec1)
 		vec3 = (vec2-vec1)/theta
-		return np.sum(np.array([[W.jsizes*(vec2-2*vec1+1)/np.square(theta), W.jsizes*vec3],
+		return np.sum(np.array([[W.jsizes*(vec2-2.*vec1+1.)/np.square(theta), W.jsizes*vec3],
 			[W.jsizes*vec3, W.jsizes*vec2]]), axis=2)
 
 
@@ -339,16 +339,16 @@ class LangevinModel:
 		self.observationtimes = np.cumsum(np.random.exponential(scale=.1, size=nobservations+1))
 
 		# generator for passing through the observed times
-		self.tgen = (time for time in self.observationtimes)
+		self.tgen = iter(self.observationtimes)
 		# start at t=0
 		self.s = 0.
-		self.t = self.tgen.__next__()
+		self.t = next(self.tgen)
 
 
 		for i in range(nobservations):
 				self.increment_process()
 				self.s = self.t
-				self.t = self.tgen.__next__()
+				self.t = next(self.tgen)
 		self.observationtimes = self.observationtimes[:-1]
 		self.observationvals = np.array(self.observationvals)
 		self.observationgrad = np.array(self.observationgrad)
