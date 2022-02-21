@@ -24,7 +24,7 @@ def info(title):
 if __name__ == '__main__':
 	info('main line')
 
-	lss = LangevinModel(mu=0., sigmasq=1., beta=0.8, kv=0.05, theta=-0.8, gsamps=10_000)
+	lss = LangevinModel(mu=0., sigmasq=1., beta=0.8, kv=0.05, theta=-1.5, gsamps=10_000)
 	lss.generate(nobservations=200)
 
 
@@ -40,10 +40,11 @@ if __name__ == '__main__':
 	ax.set_xticks([])
 	plt.show()
 
-	thetas = np.linspace(-3., -0.1, 32)
+	thetas = np.linspace(-3., -0.1, 16)
+	# thetas = np.array([-1.5])
 	
-	rbpf = RBPF(mumu=0., sigmasq=1., beta=0.8, kw=1e6, kv=.05, theta=-1., data=sampled_data, N=1_000, gsamps=5_000, epsilon=0.5)
-	lmls = p_map(rbpf.run_filter, thetas)
+	rbpf = RBPF(mumu=0., beta=0.8, kw=1e-5, kv=.05, theta=-1.5, data=sampled_data, N=500, gsamps=5_000, epsilon=0.5)
+	lmls = p_map(rbpf.run_filter_MP, thetas)
 
 	fig = plt.figure()
 	ax = fig.add_subplot()

@@ -17,7 +17,7 @@ class LangevinParticle(LangevinModel):
 	"""
 	Underlying particle object in the particle filter
 	"""
-	def __init__(self, mumu, beta, kw, kv, theta, gsamps):
+	def __init__(self, mumu, beta, kw, kv, theta, gsamps, inital_observation):
 		LangevinModel.__init__(self, mumu, 1., beta, kv, theta, gsamps)
 		# model parameters
 		self.theta = theta
@@ -40,7 +40,7 @@ class LangevinParticle(LangevinModel):
 		# self.alpha = self.acc + Cc @ np.random.randn(3)
 
 		# log particle weight
-		self.logweight = 0.
+		self.logweight = self.
 
 		self.Hmat = self.H_matrix()
 		self.Bmat = self.B_matrix()
@@ -223,7 +223,7 @@ class RBPF:
 		"""
 		Get weighted sum of current particle means
 		"""
-		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
+		wieghts = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
 		means = np.array([particle.acp for particle in self.particles])
 		return np.sum(weights*means, axis=0)
 
@@ -263,6 +263,9 @@ class RBPF:
 
 
 	def get_log_predictive_likelihood(self):
+		"""
+		Sum of predictive weights gives the log likelihood
+		"""
 		lweights = np.array([particle.logweight for particle in self.particles])
 		return logsumexp(lweights)
 
@@ -279,8 +282,9 @@ class RBPF:
 
 		for _ in tqdm(range(self.nobservations-1)):
 			self.increment_particles()
-			# log marginal term added before reweighting (based on predictive weight)
 			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
+			# log marginal term added before reweighting (based on predictive weight)
+			# print(self.log_marginal_likelihood)
 			self.reweight_particles()
 			if ret_history:
 				smean = self.get_state_mean()
@@ -306,19 +310,19 @@ class RBPF:
 
 		for _ in (range(self.nobservations-1)):
 			self.increment_particles()
-			# log marginal term added before reweighting (based on predictive weight)
 			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
+			# log marginal term added before reweighting (based on predictive weight)
+			# print(self.log_marginal_likelihood)
 			self.reweight_particles()
-
 			if self.get_logDninf() < self.log_resample_limit:
 				self.resample_particles()
 	
-			return self.log_marginal_likelihood
+		return self.log_marginal_likelihood
 
 
 	def run_filter_full_hist(self):
 		"""
-		Main loop of particle filter
+		Run the particle filter and return all particles
 		"""
 		states = np.zeros((self.nobservations, self.N))
 		grads = np.zeros((self.nobservations, self.N))
