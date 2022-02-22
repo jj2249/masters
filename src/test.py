@@ -11,7 +11,7 @@ from matplotlib.colors import to_rgb
 ### --- Forward Simulation --- ###
 
 
-lss = LangevinModel(mu=0., sigmasq=1., beta=0.8, kv=0.1, theta=-0.8, gsamps=10_000)
+lss = LangevinModel(mu=0., sigmasq=1., beta=0.8, kv=1e-6, theta=-15., gsamps=10_000)
 lss.generate(nobservations=150)
 
 
@@ -38,11 +38,11 @@ plt.show()
 
 ## - define particle filter - ##
 
-rbpf = RBPF(mumu=0., beta=0.8, kw=1e-6, kv=0.1, theta=-0.8, data=sampled_data, N=1_000, gsamps=5_000, epsilon=0.5)
+rbpf = RBPF(mumu=0., beta=0.8, kw=1, kv=1e-6, theta=-15., data=sampled_data, N=1_000, gsamps=5_000, epsilon=0.5)
 ## - containers for storing results of rbpf - ##
 fig = plt.figure()
-ax1 = fig.add_subplot(111)
-# ax2 = fig.add_subplot(212)
+ax1 = fig.add_subplot(211)
+ax2 = fig.add_subplot(212)
 
 ## - main loop of rbpf - ##
 sm, sv, gm, gv, lml = rbpf.run_filter(ret_history=True)
@@ -55,7 +55,7 @@ ax1.fill_between(rbpf.times, sm-1.96*np.sqrt(1.*sv), sm+1.96*np.sqrt(1.*sv), col
 
 
 # ## - prediction - ##
-# final_time = rbpf.current_time
+# final_time = rbpf.prev_time
 # at = 0.
 # ct = 0.
 # at2 = 0.
@@ -78,9 +78,9 @@ ax1.fill_between(rbpf.times, sm-1.96*np.sqrt(1.*sv), sm+1.96*np.sqrt(1.*sv), col
 
 
 
-# ax2.plot(rbpf.times, lss.observationgrad-lss.observationgrad[0], label='true')
-# ax2.plot(rbpf.times, gm)
-# ax2.fill_between(rbpf.times, gm-1.96*np.sqrt(gv), gm+1.96*np.sqrt(gv), color='orange', alpha=0.3)
+ax2.plot(rbpf.times, lss.observationgrad, label='true')
+ax2.plot(rbpf.times, gm)
+ax2.fill_between(rbpf.times, gm-1.96*np.sqrt(gv), gm+1.96*np.sqrt(gv), color='orange', alpha=0.3)
 # ax2.plot(ts, pm2, ls='--')
 # ax2.fill_between(ts, pm2-1.96*np.sqrt(1.*pv2), pm2+1.96*np.sqrt(1.*pv2), color='red', alpha=0.3, ls='--')
 

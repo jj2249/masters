@@ -17,7 +17,7 @@ class LangevinParticle(LangevinModel):
 	"""
 	Underlying particle object in the particle filter
 	"""
-	def __init__(self, mumu, beta, kw, kv, theta, gsamps, inital_observation):
+	def __init__(self, mumu, beta, kw, kv, theta, gsamps):
 		LangevinModel.__init__(self, mumu, 1., beta, kv, theta, gsamps)
 		# model parameters
 		self.theta = theta
@@ -30,9 +30,9 @@ class LangevinParticle(LangevinModel):
 		# initial kalman parameters
 		# a current current
 		# C current current
-		self.acc = np.array([0, 0, mumu])
+		self.acc = np.array([0., 0., mumu])
 		# self.Ccc = np.array([[0, 0, 0],[0, 0, 0],[0, 0, self.sigmasq*kw]])
-		self.Ccc = np.array([[0, 0, 0],[0, 0, 0],[0, 0, kw]])
+		self.Ccc = np.array([[0., 0., 0.],[0., 0., 0.],[0., 0., kw]])
 
 
 		# sample initial state using cholesky decomposition
@@ -40,7 +40,8 @@ class LangevinParticle(LangevinModel):
 		# self.alpha = self.acc + Cc @ np.random.randn(3)
 
 		# log particle weight
-		self.logweight = self.
+		# self.logweight = self.
+		self.logweight = 0.
 
 		self.Hmat = self.H_matrix()
 		self.Bmat = self.B_matrix()
@@ -223,7 +224,7 @@ class RBPF:
 		"""
 		Get weighted sum of current particle means
 		"""
-		wieghts = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
+		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
 		means = np.array([particle.acp for particle in self.particles])
 		return np.sum(weights*means, axis=0)
 
@@ -284,7 +285,6 @@ class RBPF:
 			self.increment_particles()
 			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
 			# log marginal term added before reweighting (based on predictive weight)
-			# print(self.log_marginal_likelihood)
 			self.reweight_particles()
 			if ret_history:
 				smean = self.get_state_mean()
@@ -307,6 +307,7 @@ class RBPF:
 		run_filter function slightly adjusted to be used for multiprocessing
 		"""
 		self.theta=theta
+		print(self.theta)
 
 		for _ in (range(self.nobservations-1)):
 			self.increment_particles()
@@ -314,7 +315,8 @@ class RBPF:
 			# log marginal term added before reweighting (based on predictive weight)
 			# print(self.log_marginal_likelihood)
 			self.reweight_particles()
-			if self.get_logDninf() < self.log_resample_limit:
+			# if self.get_logDninf() < self.log_resample_limit:
+			if self.get_logPn2() < self.log_resample_limit:
 				self.resample_particles()
 	
 		return self.log_marginal_likelihood

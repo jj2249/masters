@@ -34,7 +34,7 @@ class Application(tk.Frame):
 		self.is_correct = False
 
 	def createWidgets(self):
-		fig = plt.figure(figsize=(20,12))
+		fig = plt.figure(figsize=(12,6))
 		ax = fig.add_subplot(111)
 		canvas = FigureCanvasTkAgg(fig, master=window)
 		canvas.get_tk_widget().grid(row=0, column=1)
