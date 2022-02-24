@@ -32,7 +32,7 @@ class LangevinParticle(LangevinModel):
 		# C current current
 		self.acc = np.array([0., 0., mumu])
 		# self.Ccc = np.array([[0, 0, 0],[0, 0, 0],[0, 0, self.sigmasq*kw]])
-		self.Ccc = np.array([[0., 0., 0.],[0., 0., 0.],[0., 0., kw]])
+		self.Ccc = np.array([[kw, 0., 0.],[0., kw, 0.],[0., 0., kw]])
 
 
 		# sample initial state using cholesky decomposition
@@ -58,7 +58,6 @@ class LangevinParticle(LangevinModel):
 	def predict(self, s, t):
 		# time interval between two observations
 		dt = t - s
-
 		# latent gamma process
 		Z = GammaProcess(1., self.beta, samps=self.gsamps, minT=s, maxT=t)
 		Z.generate()
@@ -97,15 +96,13 @@ class LangevinParticle(LangevinModel):
 		Cyt = Cyt.flatten()
 
 		# update log weight
-		return -0.5 * np.log(2.*np.pi*Cyt) - (1./(2.*Cyt))*np.square(observation-ayt)
+		return (-0.5 * np.log(2.*np.pi*Cyt)) - (1./(2.*Cyt))*np.square(observation-ayt)
 
 
 	def increment(self, observation, s, t):
-		if type(s) == pd._libs.tslibs.timedeltas.Timedelta:
-				s = s.total_seconds()
-		if type(t) == pd._libs.tslibs.timedeltas.Timedelta:
-				t = t.total_seconds()
-
+		"""
+		Kalman prediction and correction plus weight update
+		"""
 		# kalman prediction step
 		self.predict(s, t)
 
@@ -126,12 +123,12 @@ class RBPF:
 		self.nobservations = self.times.shape[0]
 
 		# store initial values
-		self.initial_time = self.times[0]
-		self.initial_price = self.prices[0]
+		# self.initial_time = self.times[0]
+		# self.initial_price = self.prices[0]
 
 		# transform data so that first observation is zero and t=0
-		self.prices = self.prices.subtract(self.initial_price)
-		self.times = self.times.subtract(self.initial_time)
+		# self.prices = self.prices.subtract(self.initial_price)
+		# self.times = self.times.subtract(self.initial_time)
 
 		# generators for passing through the times and observations
 		self.timegen = iter(self.times)
@@ -147,6 +144,9 @@ class RBPF:
 		# limit for resampling based on effective sample size
 		self.log_resample_limit = np.log(self.N*epsilon)
 		self.log_marginal_likelihood = 0.
+
+		self.theta = theta
+		self.beta = beta
 
 		# collection of particles
 		self.particles = [LangevinParticle(mumu, beta, kw, kv, theta, gsamps) for _ in range(N)]
@@ -302,24 +302,19 @@ class RBPF:
 			return self.log_marginal_likelihood
 
 
-	def run_filter_MP(self, theta):
+	def run_filter_MP(self):
 		"""
 		run_filter function slightly adjusted to be used for multiprocessing
 		"""
-		self.theta=theta
-		print(self.theta)
-
 		for _ in (range(self.nobservations-1)):
 			self.increment_particles()
-			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
 			# log marginal term added before reweighting (based on predictive weight)
-			# print(self.log_marginal_likelihood)
+			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
 			self.reweight_particles()
-			# if self.get_logDninf() < self.log_resample_limit:
-			if self.get_logPn2() < self.log_resample_limit:
+			if self.get_logDninf() < self.log_resample_limit:
 				self.resample_particles()
 	
-		return self.log_marginal_likelihood
+		return (self.theta, self.beta, self.log_marginal_likelihood)
 
 
 	def run_filter_full_hist(self):

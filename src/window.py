@@ -14,7 +14,7 @@ from particlefilter import RBPF
 ### --- Forward Simulation --- ###
 
 
-lss = LangevinModel(mu=0., sigmasq=1., beta=0.8, kv=0.1, theta=-0.8, gsamps=10_000)
+lss = LangevinModel(mu=0., sigmasq=1., beta=0.8, kv=1e-6, theta=-15., gsamps=10_000)
 lss.generate(nobservations=150)
 
 
@@ -28,14 +28,15 @@ class Application(tk.Frame):
 	def __init__(self, data, master=None):
 		tk.Frame.__init__(self, master)
 		self.createWidgets()
-		self.rbpf = RBPF(mumu=0., beta=0.8, kw=1e6, kv=0.1, theta=-0.8, data=data, N=1_000, gsamps=5_000, epsilon=0.5)
+		self.rbpf = RBPF(mumu=0., beta=0.8, kw=1e-6, kv=1e-6, theta=-15., data=data, N=1_000, gsamps=5_000, epsilon=0.5)
 		self.is_observe = True
 		self.is_predict = False
 		self.is_correct = False
 
 	def createWidgets(self):
-		fig = plt.figure(figsize=(12,6))
-		ax = fig.add_subplot(111)
+		fig = plt.figure(figsize=(12,8))
+		ax = fig.add_subplot(211)
+		ax2 = fig.add_subplot(212)
 		canvas = FigureCanvasTkAgg(fig, master=window)
 		canvas.get_tk_widget().grid(row=0, column=1)
 		canvas.draw()
@@ -47,7 +48,7 @@ class Application(tk.Frame):
 		toolbar.update()
 
 		self.step_button = tk.Button(master=window,
-					command=lambda: self.step(ax, canvas, self.rbpf),
+					command=lambda: self.step(ax, ax2, canvas, self.rbpf),
 					height=2,
 					width=10,
 					text="Step")
@@ -55,27 +56,28 @@ class Application(tk.Frame):
 		self.step_button.grid(row=0, column=0, columnspan=9)
 
 
-	def step(self, ax, canvas, rbpf):
+	def step(self, ax, ax2, canvas, rbpf):
 		if self.is_observe:
-			self.observe(ax, canvas, rbpf)
+			self.observe(ax, ax2, canvas, rbpf)
 			self.is_observe = False
 			self.is_predict = True
 		elif self.is_predict:
-			self.predict(ax, canvas, rbpf)
+			self.predict(ax, ax2, canvas, rbpf)
 			self.is_predict = False
 			self.is_correct = True
 		elif self.is_correct:
-			self.correct(ax, canvas, rbpf)
+			self.correct(ax, ax2, canvas, rbpf)
 			self.is_correct = False
 			self.is_observe = True
 
 
-	def observe(self, ax, canvas, rbpf):
+	def observe(self, ax, ax2, canvas, rbpf):
 		rbpf.observe()
 		ts = np.array([rbpf.prev_time, rbpf.current_time])
 		ps = np.array([rbpf.prev_price, rbpf.current_price])
 		try:
 			ax.lines.pop(-2)
+			ax2.lines.pop(-2)
 			# ax.collections.pop(-2)
 		except:
 			pass
@@ -83,7 +85,7 @@ class Application(tk.Frame):
 		canvas.draw()
 
 
-	def predict(self, ax, canvas, rbpf):
+	def predict(self, ax, ax2, canvas, rbpf):
 		aprev = rbpf.get_state_mean()
 		cprev = rbpf.get_state_covariance()
 
@@ -93,13 +95,17 @@ class Application(tk.Frame):
 		ts = np.array([rbpf.prev_time, rbpf.current_time])
 		pm = np.array([aprev[0,0], rbpf.get_state_mean_pred()[0,0]])
 		pv = np.array([cprev[0,0], rbpf.get_state_covariance_pred()[0,0]])
+		gm = np.array([aprev[1,0], rbpf.get_state_mean_pred()[1,0]])
+		gv = np.array([cprev[1,1], rbpf.get_state_covariance_pred()[1,1]])
 
-		self.p = ax.plot(ts, pm, c='red', ls='--')
+
+		ax.plot(ts, pm, c='red', ls='--')
+		ax2.plot(ts, gm, c='red', ls='--')
 		# self.bounds = ax.fill_between(ts, pm-1.96*np.sqrt(pv), pm+1.96*np.sqrt(pv), alpha=0.3, color='blue')
 		canvas.draw()
 
 
-	def correct(self, ax, canvas, rbpf):
+	def correct(self, ax, ax2, canvas, rbpf):
 		aprev = rbpf.get_state_mean()
 		cprev = rbpf.get_state_covariance()
 
@@ -113,8 +119,12 @@ class Application(tk.Frame):
 		ts = np.array([rbpf.prev_time, rbpf.current_time])
 		pm = np.array([aprev[0,0], rbpf.get_state_mean()[0,0]])
 		pv = np.array([cprev[0,0], rbpf.get_state_covariance()[0,0]])
+		gm = np.array([aprev[1,0], rbpf.get_state_mean()[1,0]])
+		gv = np.array([cprev[1,1], rbpf.get_state_covariance()[1,1]])
 		ax.plot(ts, pm, c='orange', ls='--')
 		ax.fill_between(ts, pm-1.96*np.sqrt(pv), pm+1.96*np.sqrt(pv), alpha=0.3, color='blue')
+		ax2.plot(ts, gm, c='orange', ls='--')
+		ax2.fill_between(ts, gm-1.96*np.sqrt(gv), gm+1.96*np.sqrt(gv), alpha=0.3, color='blue')
 		canvas.draw()
 
 

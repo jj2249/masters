@@ -8,11 +8,13 @@ from process import *
 from particlefilter import RBPF
 from matplotlib.colors import to_rgb
 
+plt.style.use('ggplot')
+
 ### --- Forward Simulation --- ###
 
 
-lss = LangevinModel(mu=0., sigmasq=1., beta=0.8, kv=1e-6, theta=-15., gsamps=10_000)
-lss.generate(nobservations=150)
+lss = LangevinModel(mu=0., sigmasq=1., beta=1.8, kv=1e-6, theta=-15., gsamps=10_000)
+lss.generate(nobservations=100)
 
 
 ## - store data in a dataframe - ##
@@ -24,11 +26,11 @@ sampled_data = pd.DataFrame(data=sampled_dic)
 fig = plt.figure()
 ax1 = fig.add_subplot(211)
 ax1.plot(lss.observationtimes, lss.observationvals)
-ax1.set_xticks([])
+# ax1.set_xticks([])
 
 ax2 = fig.add_subplot(212)
 ax2.plot(lss.observationtimes, lss.observationgrad)
-ax2.set_xticks([])
+# ax2.set_xticks([])
 
 plt.show()
 
@@ -38,7 +40,7 @@ plt.show()
 
 ## - define particle filter - ##
 
-rbpf = RBPF(mumu=0., beta=0.8, kw=1, kv=1e-6, theta=-15., data=sampled_data, N=1_000, gsamps=5_000, epsilon=0.5)
+rbpf = RBPF(mumu=0., beta=1.8, kw=1e-6, kv=1e-6, theta=-15., data=sampled_data, N=1_000, gsamps=10_000, epsilon=0.5)
 ## - containers for storing results of rbpf - ##
 fig = plt.figure()
 ax1 = fig.add_subplot(211)
@@ -49,7 +51,7 @@ sm, sv, gm, gv, lml = rbpf.run_filter(ret_history=True)
 
 
 ## - plotting results of rbpf - ##
-ax1.plot(rbpf.times, lss.observationvals-lss.observationvals[0], label='true')
+ax1.plot(rbpf.times, lss.observationvals, label='true')
 ax1.plot(rbpf.times, sm)
 ax1.fill_between(rbpf.times, sm-1.96*np.sqrt(1.*sv), sm+1.96*np.sqrt(1.*sv), color='orange', alpha=0.3)
 
@@ -80,7 +82,12 @@ ax1.fill_between(rbpf.times, sm-1.96*np.sqrt(1.*sv), sm+1.96*np.sqrt(1.*sv), col
 
 ax2.plot(rbpf.times, lss.observationgrad, label='true')
 ax2.plot(rbpf.times, gm)
-ax2.fill_between(rbpf.times, gm-1.96*np.sqrt(gv), gm+1.96*np.sqrt(gv), color='orange', alpha=0.3)
+ax2.fill_between(rbpf.times, (gm-1.96*np.sqrt(gv)), (gm+1.96*np.sqrt(gv)), color='orange', alpha=0.3)
+
+
+# ax2.plot(rbpf.times[-100:], lss.observationgrad[-100:], label='true')
+# ax2.plot(rbpf.times[-100:], gm[-100:])
+# ax2.fill_between(rbpf.times[-100:], (gm-1.96*np.sqrt(gv))[-100:], (gm+1.96*np.sqrt(gv))[-100:], color='orange', alpha=0.3)
 # ax2.plot(ts, pm2, ls='--')
 # ax2.fill_between(ts, pm2-1.96*np.sqrt(1.*pv2), pm2+1.96*np.sqrt(1.*pv2), color='red', alpha=0.3, ls='--')
 
@@ -91,7 +98,7 @@ ax2.fill_between(rbpf.times, gm-1.96*np.sqrt(gv), gm+1.96*np.sqrt(gv), color='or
 # ax2.plot(rbpf.times, lss.observationgrad-lss.observationgrad[0], lw=1.5)
 # ax2.plot(rbpf.times, grads, alpha=0.05, ls='-')
 
-ax1.set_xticks([])
+# ax1.set_xticks([])
 # ax2.set_xticks([])
 fig.legend()
 plt.show()

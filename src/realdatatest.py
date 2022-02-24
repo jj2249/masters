@@ -7,7 +7,7 @@ from datahandler import TimeseriesData
 from process import *
 from particlefilter import RBPF
 
-
+plt.style.use('ggplot')
 ### --- importing data --- ###
 
 ## - import data from a .csv - ##
@@ -26,22 +26,25 @@ plt.show()
 
 ## - define particle filter - ##
 
-rbpf = RBPF(mumu=0., sigmasq=.0001, beta=0.2, kw=1e6, kv=.05, theta=-0.8, data=df_u, N=1_000, gsamps=10_000, epsilon=0.5)
+rbpf = RBPF(mumu=0., beta=0.8, kw=1., kv=1e-6, theta=-15., data=df_u, N=500, gsamps=5_000, epsilon=0.5)
 # ## - containers for storing results of rbpf - ##
 fig = plt.figure()
-ax1 = fig.add_subplot(111)
-# ax2 = fig.add_subplot(212)
+ax1 = fig.add_subplot(211)
+ax2 = fig.add_subplot(212)
 
 # ## - main loop of rbpf - ##
 sm, sv, gm, gv, lml = rbpf.run_filter(ret_history=True)
 
-### - plotting results of rbpf - ##
-ax1.plot(df_u['Date_Time'], df_u['Price'], label='true')
-ax1.plot(rbpf.times+rbpf.initial_time, sm+rbpf.initial_price)
-ax1.fill_between(rbpf.times+rbpf.initial_time, sm+rbpf.initial_price-1.96*np.sqrt(sv), sm+rbpf.initial_price+1.96*np.sqrt(sv), color='orange', alpha=0.3)
+T = 20
 
+### - plotting results of rbpf - ##
+ax1.plot(df_u['Date_Time'][T:], df_u['Price'][T:], label='true')
+ax1.plot(rbpf.times[T:], sm[T:])
+ax1.fill_between(rbpf.times[T:], (sm-1.96*np.sqrt(sv))[T:], (sm+1.96*np.sqrt(sv))[T:], color='orange', alpha=0.3)
+ax2.plot(rbpf.times[T:], gm[T:])
+ax2.fill_between(rbpf.times[T:], (gm-1.96*np.sqrt(gv))[T:], (gm+1.96*np.sqrt(gv))[T:], color='orange', alpha=0.3)
 
 ax1.set_xticks([])
-# ax2.set_xticks([])
+ax2.set_xticks([])
 fig.legend()
 plt.show()
