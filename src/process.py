@@ -228,7 +228,7 @@ class LangevinModel:
 	"""
 	State-space langevin model. State vector contains position, derivative and mean reversion parameter
 	"""
-	def __init__(self, mu, sigmasq, beta, kv, theta, gsamps):
+	def __init__(self, x0, xd0, mu, sigmasq, beta, kv, kmu, theta, gsamps):
 		# implementation paramters
 		self.gsamps = gsamps
 
@@ -237,14 +237,15 @@ class LangevinModel:
 		self.beta = beta
 		self.kv = kv
 		self.sigmasq = sigmasq
-		self.muw = mu
+		self.kmu = kmu
 
 		# initial state
-		self.state = np.array([0., 0., mu])
+		self.state = np.array([x0, xd0, mu])
 		
 		# containers for state variables over time --- not final
-		self.observationvals = []
-		self.observationgrad = []
+		self.observationvals = [x0]
+		self.observationgrad = [xd0]
+		self.observationmus = [mu]
 		
 		# use constructor functions to build state space matrices (only those that do not depend on generation of the non-linear part)
 		self.Bmat = self.B_matrix()
@@ -263,8 +264,9 @@ class LangevinModel:
 		"""
 		Noise matrix in state space model
 		"""
-		return np.vstack([np.eye(2),
-						np.zeros((1, 2))])
+		# return np.vstack([np.eye(2),
+		# 				np.zeros((1, 2))])
+		return np.eye(3)
 
 
 	def H_matrix(self):
@@ -305,6 +307,14 @@ class LangevinModel:
 			[W.jsizes*vec3, W.jsizes*vec2]]), axis=2)
 
 
+	def dynamical_noise_cov(self, Smat, dt):
+		"""
+		Ce matrix for noise -- mu is uncorrelated with the main process
+		"""
+		return np.block([[Smat, np.zeros(2).reshape(-1,1)],
+						[np.zeros(2).reshape(-1,1).T , np.sqrt(dt*self.kmu)]])
+
+
 	def increment_process(self):
 		# latent jumps from gamma process
 		Z = GammaProcess(1., self.beta, samps=self.gsamps, minT=self.s, maxT=self.t)
@@ -315,8 +325,9 @@ class LangevinModel:
 		S = self.sigmasq*self.langevin_S(self.t, self.theta, Z)
 
 		# cholesky decomposition for sampling of noise
-		Sc = np.linalg.cholesky(S + 1e-12*np.eye(2))
-		e = Sc @ np.random.randn(2)
+		Ce = self.dynamical_noise_cov(S, self.t-self.s)
+		Cec = np.linalg.cholesky(Ce+1e-12*np.eye(3))
+		e = Cec @ np.random.randn(3)
 
 		# extended state transition matrix
 		Amat = self.A_matrix(m, self.t-self.s)
@@ -329,6 +340,7 @@ class LangevinModel:
 		lastobservation = new_observation[0]
 		self.observationvals.append(lastobservation)
 		self.observationgrad.append(self.state[1])
+		self.observationmus.append(self.state[2])
 		
 	
 	def generate(self, nobservations=100):
@@ -349,7 +361,10 @@ class LangevinModel:
 				self.increment_process()
 				self.s = self.t
 				self.t = next(self.tgen)
-		self.observationtimes = self.observationtimes[:-1]
+		# discard unused observation
+		self.observationtimes = np.roll(self.observationtimes, 1)
+		self.observationtimes[0] = 0.
 		self.observationvals = np.array(self.observationvals)
 		self.observationgrad = np.array(self.observationgrad)
+		self.observationmus = np.array(self.observationmus)
 

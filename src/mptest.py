@@ -24,23 +24,21 @@ def info(title):
 
 
 def filt_grid_search(theta, beta, data):
-	return RBPF(mumu=0., beta=beta, kw=1e-6, kv=1e-6, theta=theta, data=data, N=500, gsamps=5_000, epsilon=0.5).run_filter_MP()
+	return RBPF(mux=0., mumu=0., beta=beta, kw=1e-6, kv=1e-6, kmu=1e-6, theta=theta, data=data, N=1_000, gsamps=1_000, epsilon=0.5).run_filter_MP()
 
 
 ### need to make sure that process spawning only happens once
 if __name__ == '__main__':
 	info('main line')
 	
-	lss = LangevinModel(mu=0., sigmasq=1., beta=0.8, kv=1e-6, theta=-15., gsamps=10_000)
-	lss.generate(nobservations=100)
+	lss = LangevinModel(x0=0., xd0=0., mu=0., sigmasq=1., beta=0.8, kv=1e-6, kmu=1e-6, theta=-15., gsamps=1_000)
+	lss.generate(nobservations=200)
 
-	G = 10
+	G = 15
 
 	thetas = np.linspace(-17., -13., G)
 	betas = np.linspace(0.3, 1.4, G)
-	print(np.meshgrid(thetas, betas))
-	grid = product(thetas, betas)
-	grid = (np.array(list(grid)))
+	grid = np.array(list(product(thetas, betas)))
 	theta_vals = grid[:,0]
 	beta_vals = grid[:,1]
 	## - store data in a dataframe - ##
@@ -51,10 +49,12 @@ if __name__ == '__main__':
 	## - option to plot simulated data - ##
 	
 	fig = plt.figure()
-	ax1 = fig.add_subplot(211)
-	ax2 = fig.add_subplot(212)
+	ax1 = fig.add_subplot(311)
+	ax2 = fig.add_subplot(312)
+	ax3 = fig.add_subplot(313)
 	ax1.plot(lss.observationtimes, lss.observationvals)
 	ax2.plot(lss.observationtimes, lss.observationgrad)
+	ax3.plot(lss.observationtimes, lss.observationmus)
 	ax1.set_xticks([])
 	plt.show()
 

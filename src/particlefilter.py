@@ -17,34 +17,37 @@ class LangevinParticle(LangevinModel):
 	"""
 	Underlying particle object in the particle filter
 	"""
-	def __init__(self, mumu, beta, kw, kv, theta, gsamps):
-		LangevinModel.__init__(self, mumu, 1., beta, kv, theta, gsamps)
+	def __init__(self, mux, mumu, beta, kw, kv, kmu, theta, initial_observation, gsamps):
 		# model parameters
 		self.theta = theta
 		self.kv = kv
+		self.kw = kw
 		self.beta = beta
 		
 		# implementation parameters
 		self.gsamps = gsamps
 
-		# initial kalman parameters
+		# initial kalman parameters -- also form the prior distribution
 		# a current current
 		# C current current
-		self.acc = np.array([0., 0., mumu])
+		self.acc = np.array([mux, 0., mumu])
 		# self.Ccc = np.array([[0, 0, 0],[0, 0, 0],[0, 0, self.sigmasq*kw]])
-		self.Ccc = np.array([[kw, 0., 0.],[0., kw, 0.],[0., 0., kw]])
+		self.Ccc = kw*np.eye(3)
 
+		Cc = np.linalg.cholesky(self.Ccc)
 
+		self.acc = (self.acc + Cc @ np.random.randn(3)).reshape(-1, 1)
+
+		# LangevinModel.__init__(self, initial_state[0], initial_state[1], initial_state[2], 1., beta, kv, kmu, theta, gsamps)
+		LangevinModel.__init__(self, self.acc[0], self.acc[1], self.acc[2], 1., beta, kv, kmu, theta, gsamps)
 		# sample initial state using cholesky decomposition
-		Cc = np.linalg.cholesky(self.Ccc + 1e-12*np.eye(3))
+		# Cc = np.linalg.cholesky(self.Ccc + 1e-12*np.eye(3))
 		# self.alpha = self.acc + Cc @ np.random.randn(3)
 
 		# log particle weight
-		# self.logweight = self.
-		self.logweight = 0.
-
 		self.Hmat = self.H_matrix()
 		self.Bmat = self.B_matrix()
+		self.logweight = self.get_initial_weight(initial_observation)
 
 
 	def __repr__(self):
@@ -68,10 +71,42 @@ class LangevinParticle(LangevinModel):
 		S = self.langevin_S(t, self.theta, Z)
 
 		Amat = self.A_matrix(m, dt)
-		# print(Amat)
+		Ce = self.dynamical_noise_cov(S, dt)
+
 		# prediction step
 		self.acp = (Amat @ self.acc).reshape(-1, 1)
-		self.Ccp = (Amat @ self.Ccc @ Amat.T) + (self.Bmat @ S @ self.Bmat.T)
+		self.Ccp = (Amat @ self.Ccc @ Amat.T) + (self.Bmat @ Ce @ self.Bmat.T)
+
+
+	def get_initial_weight(self, observation):
+		########################
+		### Is this correct? ###
+		########################
+		var = self.kv + self.kw
+		return ((-0.5 * np.log(2.*np.pi*var)) - (1./(2.*var))*np.square(observation-self.state[0]))[0]
+
+
+	def log_ped(self, observation):
+		# Prediction Error Decomposition
+		ayt = (self.Hmat @ self.acp)
+		# Cyt = (self.Hmat @ Ccp @ self.Hmat.T) + (self.sigmasq*self.kv)
+		Cyt = (self.Hmat @ self.Ccp @ self.Hmat.T) + (self.kv)
+		Cyt = Cyt.flatten()
+
+		# update log weight
+		return (-0.5 * np.log(2.*np.pi*Cyt)) - (1./(2.*Cyt))*np.square(observation-ayt)
+
+
+	def get_marginal_sum_updates(self, observation):
+		ayt = (self.Hmat @ self.acp)
+		Cyt = (self.Hmat @ self.Ccp @ self.Hmat.T) + (self.kv)
+		Cyt = Cyt.flatten()
+		return np.log(Cyt), np.square(observation-ayt)/Cyt
+
+	
+
+	def update_weight(self, observation):
+		self.logweight += self.log_ped(observation)
 
 
 	def correct(self, observation):
@@ -85,18 +120,7 @@ class LangevinParticle(LangevinModel):
 		self.Ccc = self.Ccp - (K @ self.Hmat @ self.Ccp)
 
 		# log prediction error decomposition to update particle weight
-		self.logweight += self.log_ped(observation)
-		
-
-	def log_ped(self, observation):
-		# Prediction Error Decomposition
-		ayt = (self.Hmat @ self.acp)
-		# Cyt = (self.Hmat @ Ccp @ self.Hmat.T) + (self.sigmasq*self.kv)
-		Cyt = (self.Hmat @ self.Ccp @ self.Hmat.T) + (self.kv)
-		Cyt = Cyt.flatten()
-
-		# update log weight
-		return (-0.5 * np.log(2.*np.pi*Cyt)) - (1./(2.*Cyt))*np.square(observation-ayt)
+		self.update_weight(observation)
 
 
 	def increment(self, observation, s, t):
@@ -115,7 +139,7 @@ class RBPF:
 	"""
 	Full rao-blackwellised (marginalised) particle filter
 	"""
-	def __init__(self, mumu, beta, kw, kv, theta, data, N, gsamps, epsilon):
+	def __init__(self, mux, mumu, beta, kw, kv, kmu, theta, data, N, gsamps, epsilon):
 
 		# x and y values for the timeseries
 		self.times = data['Date_Time']
@@ -144,15 +168,18 @@ class RBPF:
 		# limit for resampling based on effective sample size
 		self.log_resample_limit = np.log(self.N*epsilon)
 		self.log_marginal_likelihood = 0.
+		self.E = 0.
+		self.logF = 0.
 
 		self.theta = theta
 		self.beta = beta
 
 		# collection of particles
-		self.particles = [LangevinParticle(mumu, beta, kw, kv, theta, gsamps) for _ in range(N)]
-		
+		self.particles = [LangevinParticle(mux, mumu, beta, kw, kv, kmu, theta, self.current_price, gsamps) for _ in range(N)]
+		self.normalise_weights()
+	
 
-	def reweight_particles(self):
+	def normalise_weights(self):
 		"""
 		Renormalise particle weights to sum to 1
 		"""
@@ -276,16 +303,26 @@ class RBPF:
 		Main loop of particle filter
 		"""
 		if ret_history:
-			state_means = [0.]
-			state_variances = [0.]
-			grad_means = [0.]
-			grad_variances = [0.]
+			state_means = []
+			state_variances = []
+			grad_means = []
+			grad_variances = []
+			mu_means = []
+			mu_variances = []
+			smean = self.get_state_mean()
+			svar = self.get_state_covariance()
+			state_means.append(smean[0, 0])
+			state_variances.append(svar[0, 0])
+			grad_means.append(smean[1, 0])
+			grad_variances.append(svar[1, 1])
+			mu_means.append(smean[2, 0])
+			mu_variances.append(svar[2, 2])
 
 		for _ in tqdm(range(self.nobservations-1)):
 			self.increment_particles()
-			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
 			# log marginal term added before reweighting (based on predictive weight)
-			self.reweight_particles()
+			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
+			self.normalise_weights()
 			if ret_history:
 				smean = self.get_state_mean()
 				svar = self.get_state_covariance()
@@ -293,11 +330,13 @@ class RBPF:
 				state_variances.append(svar[0, 0])
 				grad_means.append(smean[1, 0])
 				grad_variances.append(svar[1, 1])
+				mu_means.append(smean[2, 0])
+				mu_variances.append(svar[2, 2])
 
 			if self.get_logDninf() < self.log_resample_limit:
 				self.resample_particles()
 		if ret_history:
-			return np.array(state_means), np.array(state_variances), np.array(grad_means), np.array(grad_variances), self.log_marginal_likelihood
+			return np.array(state_means), np.array(state_variances), np.array(grad_means), np.array(grad_variances), np.array(mu_means), np.array(mu_variances), self.log_marginal_likelihood
 		else:
 			return self.log_marginal_likelihood
 
@@ -310,7 +349,7 @@ class RBPF:
 			self.increment_particles()
 			# log marginal term added before reweighting (based on predictive weight)
 			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
-			self.reweight_particles()
+			self.normalise_weights()
 			if self.get_logDninf() < self.log_resample_limit:
 				self.resample_particles()
 	
