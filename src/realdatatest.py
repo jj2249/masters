@@ -26,14 +26,17 @@ plt.show()
 
 ## - define particle filter - ##
 
-rbpf = RBPF(mumu=0., beta=0.8, kw=1., kv=1e-6, theta=-15., data=df_u, N=500, gsamps=5_000, epsilon=0.5)
+# rbpf = RBPF(mumu=0., beta=0.8, kw=1., kv=1e-6, theta=-15., data=df_u, N=500, gsamps=5_000, epsilon=0.5)
+rbpf = RBPF(mux=0., mumu=1., beta=0.8, kw=2., kv=1e-6, kmu=1e-2, rho=1., eta=1., theta=-.5, data=df_u, N=500, gsamps=100, epsilon=0.5)
+
 # ## - containers for storing results of rbpf - ##
 fig = plt.figure()
-ax1 = fig.add_subplot(211)
-ax2 = fig.add_subplot(212)
+ax1 = fig.add_subplot(311)
+ax2 = fig.add_subplot(312)
+ax3 = fig.add_subplot(313)
 
 # ## - main loop of rbpf - ##
-sm, sv, gm, gv, lml = rbpf.run_filter(ret_history=True)
+sm, sv, gm, gv, mm, mv, lml = rbpf.run_filter(ret_history=True)
 
 T = 20
 
@@ -43,6 +46,9 @@ ax1.plot(rbpf.times[T:], sm[T:])
 ax1.fill_between(rbpf.times[T:], (sm-1.96*np.sqrt(sv))[T:], (sm+1.96*np.sqrt(sv))[T:], color='orange', alpha=0.3)
 ax2.plot(rbpf.times[T:], gm[T:])
 ax2.fill_between(rbpf.times[T:], (gm-1.96*np.sqrt(gv))[T:], (gm+1.96*np.sqrt(gv))[T:], color='orange', alpha=0.3)
+ax3.plot(rbpf.times[T:], mm[T:])
+ax3.fill_between(rbpf.times[T:], (mm-1.96*np.sqrt(mv))[T:], (mm+1.96*np.sqrt(mv))[T:], color='orange', alpha=0.3)
+
 
 ax1.set_xticks([])
 ax2.set_xticks([])

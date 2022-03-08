@@ -9,10 +9,8 @@ from functools import partial
 from itertools import product
 
 from process import *
-from datahandler import TimeseriesData
 from particlefilter import RBPF
-
-plt.style.use('ggplot')
+from datahandler import TimeseriesData
 
 
 def info(title):
@@ -24,20 +22,28 @@ def info(title):
 
 
 def filt_grid_search(theta, beta, data):
-	return RBPF(mux=0., mumu=0., beta=beta, kw=1e-6, kv=1e-6, kmu=1e-6, theta=theta, data=data, N=1_000, gsamps=1_000, epsilon=0.5).run_filter_MP()
+	return RBPF(mux=5., mumu=0., beta=beta, kw=1., kv=1., kmu=1e-6, rho=1., eta=1., theta=theta, data=data, N=100, gsamps=200, epsilon=0.5).run_filter_MP()
 
 
 ### need to make sure that process spawning only happens once
 if __name__ == '__main__':
 	info('main line')
 	
-	lss = LangevinModel(x0=0., xd0=0., mu=0., sigmasq=1., beta=0.8, kv=1e-6, kmu=1e-6, theta=-15., gsamps=1_000)
+	lss = LangevinModel(x0=0., xd0=0., mu=0., sigmasq=1., beta=0.8, kv=1e-6, kmu=1e-6, theta=-15., gsamps=100)
 	lss.generate(nobservations=200)
 
 	G = 15
 
-	thetas = np.linspace(-17., -13., G)
-	betas = np.linspace(0.3, 1.4, G)
+	## - import data from a .csv - ##
+
+	data = TimeseriesData(os.pardir+"/resources/data/test_data.csv")
+	df_u = data.remove_non_unique(ret=True)
+	plt.plot(df_u['Date_Time'], df_u['Price'])
+	plt.xticks([])
+	plt.show()
+
+	thetas = np.linspace(-25., -.1, G)
+	betas = np.linspace(0.05, 2.1, G)
 	grid = np.array(list(product(thetas, betas)))
 	theta_vals = grid[:,0]
 	beta_vals = grid[:,1]
@@ -58,7 +64,7 @@ if __name__ == '__main__':
 	ax1.set_xticks([])
 	plt.show()
 
-	results = p_umap(partial(filt_grid_search, data=sampled_data), theta_vals, beta_vals)
+	results = p_umap(partial(filt_grid_search, data=df_u), theta_vals, beta_vals)
 	
 	results = np.array(results)
 	theta_vals = results[:,0]

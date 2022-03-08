@@ -241,7 +241,6 @@ class LangevinModel:
 
 		# initial state
 		self.state = np.array([x0, xd0, mu])
-		
 		# containers for state variables over time --- not final
 		self.observationvals = [x0]
 		self.observationgrad = [xd0]
@@ -264,9 +263,9 @@ class LangevinModel:
 		"""
 		Noise matrix in state space model
 		"""
-		# return np.vstack([np.eye(2),
-		# 				np.zeros((1, 2))])
-		return np.eye(3)
+		return np.vstack([np.eye(2),
+						np.zeros((1, 2))])
+		# return np.eye(3)
 
 
 	def H_matrix(self):
@@ -311,8 +310,9 @@ class LangevinModel:
 		"""
 		Ce matrix for noise -- mu is uncorrelated with the main process
 		"""
-		return np.block([[Smat, np.zeros(2).reshape(-1,1)],
-						[np.zeros(2).reshape(-1,1).T , np.sqrt(dt*self.kmu)]])
+		# return np.block([[Smat, np.zeros(2).reshape(-1,1)],
+						# [np.zeros(2).reshape(-1,1).T , dt*self.kmu]])
+		return Smat
 
 
 	def increment_process(self):
@@ -326,8 +326,9 @@ class LangevinModel:
 
 		# cholesky decomposition for sampling of noise
 		Ce = self.dynamical_noise_cov(S, self.t-self.s)
-		Cec = np.linalg.cholesky(Ce+1e-12*np.eye(3))
-		e = Cec @ np.random.randn(3)
+		Cec = np.linalg.cholesky(Ce+1e-12*np.eye(2))
+		# Cec = np.linalg.cholesky(Ce)
+		e = Cec @ np.random.randn(2)
 
 		# extended state transition matrix
 		Amat = self.A_matrix(m, self.t-self.s)
