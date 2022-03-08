@@ -12,7 +12,7 @@ plt.style.use('ggplot')
 
 ## - import data from a .csv - ##
 
-data = TimeseriesData(os.pardir+"/resources/data/test_data2.csv")
+data = TimeseriesData(os.pardir+"/resources/data/test_data.csv")
 df_u = data.remove_non_unique(ret=True)
 plt.plot(df_u['Date_Time'], df_u['Price'])
 plt.xticks([])

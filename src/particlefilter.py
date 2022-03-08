@@ -102,8 +102,9 @@ class LangevinParticle(LangevinModel):
 
 	def log_weight_update(self, observation):
 		self.count += 1
-		ayt = (self.Hmat @ self.acp)
-		Cyt = (self.Hmat @ self.Ccp @ self.Hmat.T) + self.kv
+		ayt = (self.Hmat @ self.acp).item()
+		Cyt = ((self.Hmat @ self.Ccp @ self.Hmat.T) + self.kv).item()
+		# print(ayt, Cyt)
 		prevE = self.E
 		self.E += np.square(observation - ayt)/Cyt
 		return ((-0.5*np.log(Cyt)) - (self.rho + (self.count/2.))*np.log(self.eta + self.E/2) + (self.rho + ((self.count-1.)/2.))*np.log(self.eta + prevE/2.)).item()

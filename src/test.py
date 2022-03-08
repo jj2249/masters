@@ -15,8 +15,8 @@ plt.style.use('ggplot')
 ### --- Forward Simulation --- ###
 
 
-lss = LangevinModel(x0=0., xd0=0., mu=5., sigmasq=1., beta=0.8, kv=1e-6, kmu=1e-2, theta=-2., gsamps=5_000)
-lss.generate(nobservations=100)
+lss = LangevinModel(x0=1., xd0=0., mu=2., sigmasq=1., beta=1.8, kv=1e-6, kmu=1e-2, theta=-2., gsamps=5_000)
+lss.generate(nobservations=500)
 
 
 ## - store data in a dataframe - ##
@@ -45,7 +45,7 @@ plt.show()
 
 ## - define particle filter - ##
 
-rbpf = RBPF(mux=0., mumu=5., beta=0.8, kw=2., kv=1e-6, kmu=1e-2, rho=.1, eta=.1, theta=-2., data=sampled_data, N=200, gsamps=100, epsilon=0.5)
+rbpf = RBPF(mux=1., mumu=0., beta=1.8, kw=2., kv=1e-6, kmu=1e-2, rho=1e-5, eta=1e-5, theta=-2., data=sampled_data, N=250, gsamps=100, epsilon=0.5)
 ## - containers for storing results of rbpf - ##
 fig = plt.figure()
 ax1 = fig.add_subplot(311)
