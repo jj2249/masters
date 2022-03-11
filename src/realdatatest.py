@@ -12,10 +12,12 @@ plt.style.use('ggplot')
 
 ## - import data from a .csv - ##
 
-data = TimeseriesData(os.pardir+"/resources/data/test_data.csv")
-df_u = data.remove_non_unique(ret=True)
-plt.plot(df_u['Date_Time'], df_u['Price'])
-plt.xticks([])
+tobj = TimeseriesData(os.pardir+"/resources/data/oildata.csv")
+plt.plot(tobj.df['Telapsed'], tobj.df['Price'])
+# plt.xticks([])
+plt.xlabel('Elapsed time (minutes)')
+plt.ylabel('Price')
+
 plt.show()
 
 
@@ -27,7 +29,7 @@ plt.show()
 ## - define particle filter - ##
 
 # rbpf = RBPF(mumu=0., beta=0.8, kw=1., kv=1e-6, theta=-15., data=df_u, N=500, gsamps=5_000, epsilon=0.5)
-rbpf = RBPF(mux=0., mumu=1., beta=0.8, kw=2., kv=1e-6, kmu=1e-2, rho=1., eta=1., theta=-.5, data=df_u, N=500, gsamps=100, epsilon=0.5)
+rbpf = RBPF(mux=110., mumu=0., beta=5., kw=2., kv=1e-2, kmu=1e-2, rho=1e-5, eta=1e-5, theta=-5., data=tobj.df, N=500, gsamps=100, epsilon=0.5)
 
 # ## - containers for storing results of rbpf - ##
 fig = plt.figure()
@@ -36,12 +38,12 @@ ax2 = fig.add_subplot(312)
 ax3 = fig.add_subplot(313)
 
 # ## - main loop of rbpf - ##
-sm, sv, gm, gv, mm, mv, lml = rbpf.run_filter(ret_history=True)
+sm, sv, gm, gv, mm, mv, lml = rbpf.run_filter(ret_history=True, tpred=15.)
 
-T = 20
+T = 0
 
 ### - plotting results of rbpf - ##
-ax1.plot(df_u['Date_Time'][T:], df_u['Price'][T:], label='true')
+ax1.plot(tobj.df['Telapsed'][T:], tobj.df['Price'][T:], label='true')
 ax1.plot(rbpf.times[T:], sm[T:])
 ax1.fill_between(rbpf.times[T:], (sm-1.96*np.sqrt(sv))[T:], (sm+1.96*np.sqrt(sv))[T:], color='orange', alpha=0.3)
 ax2.plot(rbpf.times[T:], gm[T:])

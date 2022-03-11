@@ -61,7 +61,7 @@ class LangevinParticle(LangevinModel):
 			)
 
 
-	def predict(self, s, t):
+	def predict(self, s, t, ret=False):
 		# time interval between two observations
 		dt = t - s
 		# latent gamma process
@@ -79,6 +79,8 @@ class LangevinParticle(LangevinModel):
 		# prediction step
 		self.acp = (Amat @ self.acc).reshape(-1, 1)
 		self.Ccp = (Amat @ self.Ccc @ Amat.T) + (self.Bmat @ Ce @ self.Bmat.T)
+		if ret:
+			return self.acp, self.Ccp
 
 
 	def get_initial_weight(self, observation):
@@ -148,17 +150,9 @@ class RBPF:
 	def __init__(self, mux, mumu, beta, kw, kv, kmu, rho, eta, theta, data, N, gsamps, epsilon):
 
 		# x and y values for the timeseries
-		self.times = data['Date_Time']
+		self.times = data['Telapsed']
 		self.prices = data['Price']
 		self.nobservations = self.times.shape[0]
-
-		# store initial values
-		# self.initial_time = self.times[0]
-		# self.initial_price = self.prices[0]
-
-		# transform data so that first observation is zero and t=0
-		# self.prices = self.prices.subtract(self.initial_price)
-		# self.times = self.times.subtract(self.initial_time)
 
 		# generators for passing through the times and observations
 		self.timegen = iter(self.times)
@@ -174,10 +168,12 @@ class RBPF:
 		# limit for resampling based on effective sample size
 		self.log_resample_limit = np.log(self.N*epsilon)
 		self.log_marginal_likelihood = 0.
-		self.logF = 0.
+		# self.logF = 0.
 
 		self.theta = theta
 		self.beta = beta
+		self.rho = rho
+		self.eta = eta
 
 		# collection of particles
 		self.particles = [LangevinParticle(mux, mumu, beta, kw, kv, kmu, rho, eta, theta, self.current_price, gsamps) for _ in range(N)]
@@ -213,6 +209,10 @@ class RBPF:
 		for particle in self.particles:
 			particle.increment(self.current_price, self.prev_time, self.current_time)
 
+
+	def predict_particles(self, t_current, t_pred):
+		for particle in self.particles:
+			particle.predict(t_current, t_current+t_pred)
 
 	def resample_particles(self):
 		"""
@@ -252,15 +252,6 @@ class RBPF:
 		return np.sum(weights*means, axis=0)
 
 
-	def get_state_mean_pred(self):
-		"""
-		Get weighted sum of current particle means
-		"""
-		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
-		means = np.array([particle.acp for particle in self.particles])
-		return np.sum(weights*means, axis=0)
-
-
 	def get_state_covariance(self):
 		"""
 		Get weighted sum of current particle variances
@@ -268,6 +259,15 @@ class RBPF:
 		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
 		covs = np.array([particle.Ccc for particle in self.particles])
 		return np.sum(weights*covs, axis=0)
+
+
+	def get_state_mean_pred(self):
+		"""
+		Get weighted sum of current particle means
+		"""
+		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
+		means = np.array([particle.acp for particle in self.particles])
+		return np.sum(weights*means, axis=0)
 
 
 	def get_state_covariance_pred(self):
@@ -303,23 +303,35 @@ class RBPF:
 		return logsumexp(lweights)
 
 
-	def run_filter(self, ret_history=False):
+	def sigma_posterior(self, x, count, E):
+		rhod = self.rho + (count/2.)
+		etad = self.eta + (E/2.)
+		return -(rhod+1)*np.log(x)-np.divide(etad, x)
+
+
+	def run_filter(self, ret_history=False, plot_marginal=False, ax=None, axsamps=1000, smin=0.1, smax=15., tpred=0.):
 		"""
 		Main loop of particle filter
 		"""
 		if ret_history:
 			state_means = []
 			state_variances = []
+
 			grad_means = []
 			grad_variances = []
+
 			mu_means = []
 			mu_variances = []
+
 			smean = self.get_state_mean()
 			svar = self.get_state_covariance()
+
 			state_means.append(smean[0, 0])
 			state_variances.append(svar[0, 0])
+
 			grad_means.append(smean[1, 0])
 			grad_variances.append(svar[1, 1])
+
 			mu_means.append(smean[2, 0])
 			mu_variances.append(svar[2, 2])
 
@@ -328,20 +340,60 @@ class RBPF:
 			# log marginal term added before reweighting (based on predictive weight)
 			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
 			self.normalise_weights()
+
 			if ret_history:
 				smean = self.get_state_mean()
 				svar = self.get_state_covariance()
+
 				state_means.append(smean[0, 0])
 				state_variances.append(svar[0, 0])
+
 				grad_means.append(smean[1, 0])
 				grad_variances.append(svar[1, 1])
+
 				mu_means.append(smean[2, 0])
 				mu_variances.append(svar[2, 2])
 
 			if self.get_logDninf() < self.log_resample_limit:
 				self.resample_particles()
-		if ret_history:
-			return np.array(state_means), np.array(state_variances), np.array(grad_means), np.array(grad_variances), np.array(mu_means), np.array(mu_variances), self.log_marginal_likelihood, self.nobservations, np.array([np.exp(particle.logweight) for particle in self.particles]), np.array([particle.E for particle in self.particles])
+		
+		if ret_history and tpred>0.:
+			self.times = self.times.tolist()
+			self.times.append(self.prev_time+tpred)
+			self.predict_particles(self.prev_time, tpred)
+
+			smean = self.get_state_mean_pred()
+			svar = self.get_state_covariance_pred()
+
+			state_means.append(smean[0, 0])
+			state_variances.append(svar[0, 0])
+
+			grad_means.append(smean[1, 0])
+			grad_variances.append(svar[1, 1])
+
+			mu_means.append(smean[2, 0])
+			mu_variances.append(svar[2, 2])
+
+		if plot_marginal and ret_history:
+			weights = np.array([np.exp(particle.logweight) for particle in self.particles])
+			Es = np.array([particle.E for particle in self.particles])
+			count = int(self.particles[0].count)
+			mixture = np.zeros(axsamps)
+			mode = 0.
+			mean = 0.
+			axis = np.linspace(smin, smax, axsamps)
+			for i in range(count):
+				mixture += (weights[i] * self.sigma_posterior(axis, count, Es[i]))
+				mode += weights[i] * (self.eta + (Es[i]/2.))/(self.rho+(count/2.)+1)
+				mean += weights[i] * (self.eta + (Es[i]/2.))/(self.rho+(count/2.)-1)
+
+			ax.plot(axis, mixture-logsumexp(mixture))
+
+			return np.array(state_means), np.array(state_variances), np.array(grad_means), np.array(grad_variances), np.array(mu_means), np.array(mu_variances), self.log_marginal_likelihood, ax, mode, mean
+		
+		elif ret_history:
+			return np.array(state_means), np.array(state_variances), np.array(grad_means), np.array(grad_variances), np.array(mu_means), np.array(mu_variances), self.log_marginal_likelihood
+		
 		else:
 			return self.log_marginal_likelihood
 
@@ -367,12 +419,11 @@ class RBPF:
 		"""
 		states = np.zeros((self.nobservations, self.N))
 		grads = np.zeros((self.nobservations, self.N))
+		skews = np.zeros((self.nobservations, self.N))
 
-		# weights = np.zeros((self.nobservations, self.N))
-		# weights[0,:] = np.ones(self.N)
 		for i in tqdm(range(self.nobservations-1)):
 			self.increment_particles()
-			self.reweight_particles()
+			self.normalise_weights()
 
 			if self.get_logDninf() < self.log_resample_limit:
 				self.resample_particles()
@@ -381,10 +432,7 @@ class RBPF:
 			states[i+1, :] = curr_states
 			curr_grads = np.array([particle.acc[1,0] for particle in self.particles])
 			grads[i+1, :] = curr_grads
-			# curr_weights = np.array([particle.logweight for particle in self.particles]).flatten()
-			# curr_weights -= np.min(curr_weights)
-			# curr_weights /= np.max(curr_weights)
-			# curr_weights = np.nan_to_num(curr_weights, nan=1.0)
-			# weights[i+1, :] = curr_weights
+			curr_skews = np.array([particle.acc[2,0] for particle in self.particles])
+			skews[i+1, :] = curr_skews			
 
-		return states, grads
+		return states, grads, skews

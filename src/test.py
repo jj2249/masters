@@ -14,9 +14,8 @@ plt.style.use('ggplot')
 
 ### --- Forward Simulation --- ###
 
-
-lss = LangevinModel(x0=1., xd0=0., mu=2., sigmasq=1., beta=1.8, kv=1e-6, kmu=1e-2, theta=-2., gsamps=5_000)
-lss.generate(nobservations=500)
+lss = LangevinModel(x0=0., xd0=0., mu=0., sigmasq=1., beta=9., kv=5e-3, kmu=1e-4, theta=-4., gsamps=5_000)
+lss.generate(nobservations=200)
 
 
 ## - store data in a dataframe - ##
@@ -37,110 +36,66 @@ ax2.plot(lss.observationtimes, lss.observationgrad)
 ax3 = fig.add_subplot(313)
 ax3.plot(lss.observationtimes, lss.observationmus)
 
+ax1.set_ylabel(r'Position, $x$')
+ax2.set_ylabel(r'Velocity, $\.x$')
+ax3.set_ylabel(r'Skew, $\mu$')
 plt.show()
-
 
 ### --- RBPF --- ###
 
-
 ## - define particle filter - ##
 
-rbpf = RBPF(mux=1., mumu=0., beta=1.8, kw=2., kv=1e-6, kmu=1e-2, rho=1e-5, eta=1e-5, theta=-2., data=sampled_data, N=250, gsamps=100, epsilon=0.5)
+rbpf = RBPF(mux=0., mumu=0., beta=9., kw=2., kv=5e-3, kmu=1e-4, rho=1e-5, eta=1e-5, theta=-4., data=sampled_data, N=200, gsamps=200, epsilon=0.5, tpred=0.2)
 ## - containers for storing results of rbpf - ##
 fig = plt.figure()
 ax1 = fig.add_subplot(311)
 ax2 = fig.add_subplot(312)
 ax3 = fig.add_subplot(313)
-## - main loop of rbpf - ##
-sm, sv, gm, gv, mm, mv, lml, count, weights, Es = rbpf.run_filter(ret_history=True)
+fig2 = plt.figure()
+axxx = fig2.add_subplot(111)
 
-T = 0
+## - main loop of rbpf - ##
+sm, sv, gm, gv, mm, mv, lml, ax, mode, mean = rbpf.run_filter(ret_history=True, plot_marginal=True, ax=axxx)
+
+T = 40
 
 ## - plotting results of rbpf - ##
-ax1.plot(rbpf.times[T:], lss.observationvals[T:], label='true')
-ax1.plot(rbpf.times[T:], sm[T:])
+ax1.plot(rbpf.times[T:-1], lss.observationvals[T:], label='true')
+ax1.plot(rbpf.times[T:], sm[T:], label='inferred')
 ax1.fill_between(rbpf.times[T:], (sm-1.96*np.sqrt(1.*sv))[T:], (sm+1.96*np.sqrt(1.*sv))[T:], color='orange', alpha=0.3)
 
-ax2.plot(rbpf.times[T:], lss.observationgrad[T:], label='true')
+ax2.plot(rbpf.times[T:-1], lss.observationgrad[T:])
 ax2.plot(rbpf.times[T:], gm[T:])
 ax2.fill_between(rbpf.times[T:], (gm-1.96*np.sqrt(gv))[T:], (gm+1.96*np.sqrt(gv))[T:], color='orange', alpha=0.3)
 
-ax3.plot(rbpf.times[T:], lss.observationmus[T:], label='true')
+ax3.plot(rbpf.times[T:-1], lss.observationmus[T:])
 ax3.plot(rbpf.times[T:], mm[T:])
 ax3.fill_between(rbpf.times[T:], (mm-1.96*np.sqrt(mv))[T:], (mm+1.96*np.sqrt(mv))[T:], color='orange', alpha=0.3)
 
-# ## - prediction - ##
-# final_time = rbpf.prev_time
-# at = 0.
-# ct = 0.
-# at2 = 0.
-# ct2 = 0.
-# for particle in rbpf.particles:
-# 	w = np.exp(particle.logweight)
-# 	ap, Cp = particle.predict(final_time, final_time+1.)
-# 	at += (ap*w)[0,0]
-# 	ct += (Cp*w)[0,0]
-# 	at2 +=(ap*w)[1,0]
-# 	ct2 += (Cp*w)[1,1]
-# ts = np.array([final_time, final_time+1.])
-# pm = np.array([sm[-1], at])
-# pv = np.array([sv[-1], ct])
-# pm2 = np.array([gm[-1], at2])
-# pv2 = np.array([gv[-1], ct2])
-# # print(pm, pv)
-# ax1.plot(ts, pm, ls='--')
-# ax1.fill_between(ts, pm-1.96*np.sqrt(1.*pv), pm+1.96*np.sqrt(1.*pv), color='red', alpha=0.3, ls='--')
+ax1.set_ylabel(r'Position, $x$')
+ax2.set_ylabel(r'Velocity, $\.x$')
+ax3.set_ylabel(r'Skew, $\mu$')
+ax3.set_xlabel(r'Time, $t$')
 
-
-
-
-
-# ax2.plot(rbpf.times[-100:], lss.observationgrad[-100:], label='true')
-# ax2.plot(rbpf.times[-100:], gm[-100:])
-# ax2.fill_between(rbpf.times[-100:], (gm-1.96*np.sqrt(gv))[-100:], (gm+1.96*np.sqrt(gv))[-100:], color='orange', alpha=0.3)
-# ax2.plot(ts, pm2, ls='--')
-# ax2.fill_between(ts, pm2-1.96*np.sqrt(1.*pv2), pm2+1.96*np.sqrt(1.*pv2), color='red', alpha=0.3, ls='--')
 
 ## - full history - ##
-# states, grads = rbpf.run_filter_full_hist()
-# ax1.plot(rbpf.times, lss.observationvals-lss.observationvals[0], lw=1.5)
+# states, grads, skews = rbpf.run_filter_full_hist()
+# ax1.plot(rbpf.times, lss.observationvals, lw=1.5)
 # ax1.plot(rbpf.times, states, alpha=0.05, ls='-')
-# ax2.plot(rbpf.times, lss.observationgrad-lss.observationgrad[0], lw=1.5)
+# ax2.plot(rbpf.times, lss.observationgrad, lw=1.5)
 # ax2.plot(rbpf.times, grads, alpha=0.05, ls='-')
+# ax3.plot(rbpf.times, lss.observationmus, lw=1.5)
+# ax3.plot(rbpf.times, skews, alpha=0.05, ls='-')
 
 # ax1.set_xticks([])
 # ax2.set_xticks([])
 fig.legend()
 
-fig2 = plt.figure()
-axxx = fig2.add_subplot(111)
-axis = np.linspace(0.1, 2., 1000)
 
-def pdf(x, rho, eta):
-	return (np.power(eta, rho)/gamma(rho)) * np.power(x, (-rho-1))*np.exp(-eta/x)
-mixture = np.zeros(1000)
-mixture = pdf(axis, 0.1, 0.1)
-# print(weights)
-for i in range(200):
-	print(count/2, Es[i])
-	mixture += (weights[i] * pdf(axis, 1.+(count/2.), 1.+(Es[i]/2.))).flatten()
-axxx.plot(axis, mixture)
+axxx.set_xlabel(r'Scale, $\sigma^2$')
+axxx.set_ylabel(r'log $p(\sigma^2 | y_{1:N})$')
+fig.suptitle(r'State Vector Filtering: $p(\alpha_t | y_{1:t}, \sigma^2)$')
+fig2.suptitle(r'Posterior Scale Density, mode, mean: ' +str(mode) + ', ' +str(mean))
 plt.show()
 
 
-
-### --- Parameter Estimation --- ###
-# thetas = np.linspace(-5., -0.2, 10)
-# print(thetas)
-# lmls = []
-# for theta in tqdm(thetas):
-# 	rbpf = RBPF(mumu=0., sigmasq=1., beta=0.8, kw=1e6, kv=.05, theta=theta, data=sampled_data, N=1_000, gsamps=5_000, epsilon=0.5)
-# 	lml = rbpf.run_filter()
-# 	lmls.append(-1.*lml)
-
-# fig = plt.figure()
-# ax = fig.add_subplot()
-# ax.bar(thetas, lmls, width=0.05)
-# ax.set_xlabel('theta')
-# ax.set_ylabel('-lml')
-# plt.show()
