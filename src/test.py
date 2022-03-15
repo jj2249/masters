@@ -14,12 +14,12 @@ plt.style.use('ggplot')
 
 ### --- Forward Simulation --- ###
 
-lss = LangevinModel(x0=0., xd0=0., mu=0., sigmasq=1., beta=9., kv=5e-3, kmu=1e-4, theta=-4., gsamps=5_000)
+lss = LangevinModel(x0=1., xd0=0., mu=1., sigmasq=1., beta=.9, kv=5e-5, kmu=1e-0, theta=-4., gsamps=5_000)
 lss.generate(nobservations=200)
 
 
 ## - store data in a dataframe - ##
-sampled_dic = {'Date_Time': lss.observationtimes, 'Price': lss.observationvals}
+sampled_dic = {'Telapsed': lss.observationtimes, 'Price': lss.observationvals}
 sampled_data = pd.DataFrame(data=sampled_dic)
 
 ## - option to plot simulated data - ##
@@ -45,7 +45,7 @@ plt.show()
 
 ## - define particle filter - ##
 
-rbpf = RBPF(mux=0., mumu=0., beta=9., kw=2., kv=5e-3, kmu=1e-4, rho=1e-5, eta=1e-5, theta=-4., data=sampled_data, N=200, gsamps=200, epsilon=0.5, tpred=0.2)
+rbpf = RBPF(mux=0., mumu=0., beta=.9, kw=2., kv=5e-5, kmu=1e-0, rho=1e-5, eta=1e-5, theta=-4., data=sampled_data, N=200, gsamps=200, epsilon=0.5)
 ## - containers for storing results of rbpf - ##
 fig = plt.figure()
 ax1 = fig.add_subplot(311)
@@ -55,9 +55,9 @@ fig2 = plt.figure()
 axxx = fig2.add_subplot(111)
 
 ## - main loop of rbpf - ##
-sm, sv, gm, gv, mm, mv, lml, ax, mode, mean = rbpf.run_filter(ret_history=True, plot_marginal=True, ax=axxx)
+sm, sv, gm, gv, mm, mv, lml, ax, mode, mean = rbpf.run_filter(ret_history=True, plot_marginal=True, ax=axxx, tpred=1.)
 
-T = 40
+T = 0
 
 ## - plotting results of rbpf - ##
 ax1.plot(rbpf.times[T:-1], lss.observationvals[T:], label='true')

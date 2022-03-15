@@ -243,40 +243,66 @@ class RBPF:
 			particle.logweight = -np.log(self.N)
 
 
-	def get_state_mean(self):
+	def get_state_posterior(self):
 		"""
-		Get weighted sum of current particle means
-		"""
-		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
-		means = np.array([particle.acc for particle in self.particles])
-		return np.sum(weights*means, axis=0)
-
-
-	def get_state_covariance(self):
-		"""
-		Get weighted sum of current particle variances
+		Get the parameters of the corrected mixture distribution
 		"""
 		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
-		covs = np.array([particle.Ccc for particle in self.particles])
-		return np.sum(weights*covs, axis=0)
+		eX = np.array([particle.acc for particle in self.particles])
+
+		msum = np.sum(weights*eX, axis=0)
+		eXXt = np.array([particle.Ccc + (particle.acc @ particle.acc.T) for particle in self.particles])
+
+		return msum, (np.sum(weights*eXXt, axis=0) - (msum @ msum.T))
 
 
-	def get_state_mean_pred(self):
+	def get_state_posterior_predictive(self):
 		"""
-		Get weighted sum of current particle means
-		"""
-		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
-		means = np.array([particle.acp for particle in self.particles])
-		return np.sum(weights*means, axis=0)
-
-
-	def get_state_covariance_pred(self):
-		"""
-		Get weighted sum of current particle variances
+		Get the parameters of the predictive mixture distribution
 		"""
 		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
-		covs = np.array([particle.Ccp for particle in self.particles])
-		return np.sum(weights*covs, axis=0)
+		eX = np.array([particle.acp for particle in self.particles])
+
+		msum = np.sum(weights*eX, axis=0)
+		eXXt = np.array([particle.Ccp + (particle.acp @ particle.acp.T) for particle in self.particles])
+
+		return msum, (np.sum(weights*eXXt, axis=0) - (msum @ msum.T))
+
+
+	# def get_state_mean(self):
+	# 	"""
+	# 	Get weighted sum of current particle means
+	# 	"""
+	# 	weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
+	# 	means = np.array([particle.acc for particle in self.particles])
+	# 	return np.sum(weights*means, axis=0)
+
+
+	# def get_state_covariance(self):
+	# 	"""
+	# 	Get weighted sum of current particle variances
+	# 	"""
+	# 	weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
+	# 	covs = np.array([particle.Ccc for particle in self.particles])
+	# 	return np.sum(weights*covs, axis=0)
+
+
+	# def get_state_mean_pred(self):
+	# 	"""
+	# 	Get weighted sum of current particle means
+	# 	"""
+	# 	weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
+	# 	means = np.array([particle.acp for particle in self.particles])
+	# 	return np.sum(weights*means, axis=0)
+
+
+	# def get_state_covariance_pred(self):
+	# 	"""
+	# 	Get weighted sum of current particle variances
+	# 	"""
+	# 	weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
+	# 	covs = np.array([particle.Ccp for particle in self.particles])
+	# 	return np.sum(weights*covs, axis=0)
 
 
 	def get_logPn2(self):
@@ -323,8 +349,9 @@ class RBPF:
 			mu_means = []
 			mu_variances = []
 
-			smean = self.get_state_mean()
-			svar = self.get_state_covariance()
+			# smean = self.get_state_mean()
+			# svar = self.get_state_covariance()
+			smean, svar = self.get_state_posterior()
 
 			state_means.append(smean[0, 0])
 			state_variances.append(svar[0, 0])
@@ -342,8 +369,9 @@ class RBPF:
 			self.normalise_weights()
 
 			if ret_history:
-				smean = self.get_state_mean()
-				svar = self.get_state_covariance()
+				# smean = self.get_state_mean()
+				# svar = self.get_state_covariance()
+				smean, svar = self.get_state_posterior()
 
 				state_means.append(smean[0, 0])
 				state_variances.append(svar[0, 0])
@@ -362,8 +390,9 @@ class RBPF:
 			self.times.append(self.prev_time+tpred)
 			self.predict_particles(self.prev_time, tpred)
 
-			smean = self.get_state_mean_pred()
-			svar = self.get_state_covariance_pred()
+			# smean = self.get_state_mean_pred()
+			# svar = self.get_state_covariance_pred()
+			smean, svar = self.get_state_posterior_predictive()
 
 			state_means.append(smean[0, 0])
 			state_variances.append(svar[0, 0])
@@ -382,7 +411,7 @@ class RBPF:
 			mode = 0.
 			mean = 0.
 			axis = np.linspace(smin, smax, axsamps)
-			for i in range(count):
+			for i in range(self.N):
 				mixture += (weights[i] * self.sigma_posterior(axis, count, Es[i]))
 				mode += weights[i] * (self.eta + (Es[i]/2.))/(self.rho+(count/2.)+1)
 				mean += weights[i] * (self.eta + (Es[i]/2.))/(self.rho+(count/2.)-1)

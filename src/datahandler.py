@@ -14,10 +14,10 @@ class TimeseriesData:
 	# 	print(self.df)
 
 
-	def __init__(self, path):
+	def __init__(self, path, idx1=0):
 		self.path = path
 		dftemp = pd.read_csv(self.path, sep=',')
-		self.df = pd.DataFrame(dftemp[['Telapsed', 'Price']])
+		self.df = pd.DataFrame(dftemp[['Telapsed', 'Price']][idx1:])
 
 
 	def remove_non_unique(self, ret=False):

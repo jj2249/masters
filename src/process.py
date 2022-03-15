@@ -156,7 +156,6 @@ class GammaProcess(JumpProcess):
 		self.sort_jumps()
 
 
-
 	def marginal_gamma(self, x, t, ax, label=''):
 		"""
 		Plot the marginal gamma distribution on a given set of axes
@@ -306,11 +305,11 @@ class LangevinModel:
 			[W.jsizes*vec3, W.jsizes*vec2]]), axis=2)
 
 
-	def dynamical_noise_cov(self, Smat, dt):
+	def dynamical_noise_cov(self, Smat, dt, reg=0.):
 		"""
 		Ce matrix for noise -- mu is uncorrelated with the main process
 		"""
-		return np.block([[Smat, np.zeros(2).reshape(-1,1)],
+		return np.block([[Smat+reg*np.eye(2), np.zeros(2).reshape(-1,1)],
 						[np.zeros(2).reshape(-1,1).T , dt*self.kmu]])
 		# return Smat
 
@@ -325,8 +324,8 @@ class LangevinModel:
 		S = self.sigmasq*self.langevin_S(self.t, self.theta, Z)
 
 		# cholesky decomposition for sampling of noise
-		Ce = self.dynamical_noise_cov(S, self.t-self.s)
-		Cec = np.linalg.cholesky(Ce+1e-12*np.eye(3))
+		Ce = self.dynamical_noise_cov(S, self.t-self.s, reg=1e-12)
+		Cec = np.linalg.cholesky(Ce)
 		# Cec = np.linalg.cholesky(Ce)
 		e = Cec @ np.random.randn(3)
 
