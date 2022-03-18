@@ -10,9 +10,9 @@ import os
 
 
 plt.style.use('ggplot')
-tobj = TimeseriesData(os.pardir+"/resources/data/btceur.csv", idx1=-500)
-plt.plot(tobj.df['Telapsed'], tobj.df['Price'])
-plt.show()
+tobj = TimeseriesData(os.pardir+"/resources/data/brentdata.csv", idx1=-160)
+# plt.plot(tobj.df['Telapsed'], tobj.df['Price'])
+# plt.show()
 
 
 
@@ -21,7 +21,7 @@ plt.show()
 
 # - define particle filter - ##
 
-rbpf = RBPF(mux=35000., mumu=0., beta=15., kw=2., kv=1e-2, kmu=1e-2, rho=1e-5, eta=1e-5, theta=-4., data=tobj.df, N=200, gsamps=200, epsilon=0.5)
+rbpf = RBPF(mux=125., mumu=0., beta=29., kw=1., kv=1e-1, kmu=0., rho=1e-5, eta=1e-5, theta=-4., p=0., data=tobj.df, N=500, gsamps=1000, epsilon=0.5)
 
 ## - containers for storing results of rbpf - ##
 fig = plt.figure()
@@ -32,7 +32,7 @@ fig2 = plt.figure()
 axxx = fig2.add_subplot(111)
 
 ## - main loop of rbpf - ##
-sm, sv, gm, gv, mm, mv, lml, ax, mode, mean = rbpf.run_filter(ret_history=True, plot_marginal=True, ax=axxx, tpred=1.)
+sm, sv, gm, gv, mm, mv, lml, ax, mode, mean = rbpf.run_filter(ret_history=True, plot_marginal=True, ax=axxx, tpred=0.01)
 
 T = 0
 
@@ -42,7 +42,7 @@ ax1.plot(rbpf.times[T:], sm[T:], label='inferred')
 ax1.fill_between(rbpf.times[T:], (sm-1.96*np.sqrt(mode*sv))[T:], (sm+1.96*np.sqrt(mode*sv))[T:], color='orange', alpha=0.3)
 
 ax2.plot(rbpf.times[T:], gm[T:])
-ax2.fill_between(rbpf.times[T:], (gm-1.96*np.sqrt(mode*gv))[T:], (gm+1.96*np.sqrt(mode*gv))[T:], color='orange', alpha=0.3)
+# ax2.fill_between(rbpf.times[T:], (gm-1.96*np.sqrt(mode*gv))[T:], (gm+1.96*np.sqrt(mode*gv))[T:], color='orange', alpha=0.3)
 
 ax3.plot(rbpf.times[T:], mm[T:])
 ax3.fill_between(rbpf.times[T:], (mm-1.96*np.sqrt(mode*mv))[T:], (mm+1.96*np.sqrt(mode*mv))[T:], color='orange', alpha=0.3)

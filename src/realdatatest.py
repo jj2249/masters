@@ -10,7 +10,7 @@ import os
 
 
 def filt_grid_search(theta, beta, data):
-	return RBPF(mux=35000., mumu=0., beta=beta, kw=2., kv=10., kmu=1e-2, rho=1e-5, eta=1e-5, theta=theta, data=data, N=100, gsamps=200, epsilon=0.5).run_filter_MP()
+	return RBPF(mux=125., mumu=0., beta=beta, kw=2., kv=1e-1, kmu=0., rho=1e-5, eta=1e-5, theta=theta, p=0., data=data, N=200, gsamps=200, epsilon=0.5).run_filter_MP()
 
 
 ### need to make sure that process spawning only happens once
@@ -24,10 +24,10 @@ if __name__ == '__main__':
 	# lss = LangevinModel(x0=0., xd0=0., mu=0., sigmasq=1., beta=0.8, kv=1e-6, kmu=1e-6, theta=-15., gsamps=100)
 	# lss.generate(nobservations=200)
 	Gt = 10
-	Gb = 15
+	Gb = 10
 
-	thetas = np.linspace(-6., -2, Gt)
-	betas = np.linspace(15., 60., Gb)
+	thetas = np.linspace(-7., -0.8, Gt)
+	betas = np.linspace(10., 50., Gb)
 	grid = np.array(list(product(thetas, betas)))
 	theta_vals = grid[:,0]
 	beta_vals = grid[:,1]

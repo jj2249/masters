@@ -227,7 +227,7 @@ class LangevinModel:
 	"""
 	State-space langevin model. State vector contains position, derivative and mean reversion parameter
 	"""
-	def __init__(self, x0, xd0, mu, sigmasq, beta, kv, kmu, theta, gsamps):
+	def __init__(self, x0, xd0, mu, sigmasq, beta, kv, kmu, theta, p, gsamps):
 		# implementation paramters
 		self.gsamps = gsamps
 
@@ -237,6 +237,7 @@ class LangevinModel:
 		self.kv = kv
 		self.sigmasq = sigmasq
 		self.kmu = kmu
+		self.p = p
 
 		# initial state
 		self.state = np.array([x0, xd0, mu])
@@ -254,9 +255,14 @@ class LangevinModel:
 		"""
 		State transition matrix constructor -- depends on non-linear part of the state (W)
 		"""
-		return np.block([[self.langevin_drift(dt, self.theta), m],
+		num = np.random.rand()
+		A = np.block([[self.langevin_drift(dt, self.theta), m],
 						[np.zeros((1, 2)), 1.]])
-
+		if num < self.p:
+			A[1,1] = 0.
+			return A
+		else:
+			return A
 
 	def B_matrix(self):
 		"""

@@ -14,7 +14,25 @@ plt.style.use('ggplot')
 
 ### --- Forward Simulation --- ###
 
-lss = LangevinModel(x0=1., xd0=0., mu=1., sigmasq=1., beta=.9, kv=5e-5, kmu=1e-0, theta=-4., gsamps=5_000)
+x0 = 0.
+xd0 = 0.
+mu0 = 0.
+sigmasq = 1.
+beta = 5.
+kv = 5e-4
+kmu = 1e-5
+theta = -2.
+p = 0.1
+gsamps1 = 5_000
+
+kw = 2.
+rho = 1e-5
+eta = 1e-5
+N = 200
+gsamps2 = 200
+epsilon = 0.5
+
+lss = LangevinModel(x0=x0, xd0=xd0, mu=mu0, sigmasq=sigmasq, beta=beta, kv=kv, kmu=kmu, theta=theta, p=p, gsamps=gsamps1)
 lss.generate(nobservations=200)
 
 
@@ -45,7 +63,7 @@ plt.show()
 
 ## - define particle filter - ##
 
-rbpf = RBPF(mux=0., mumu=0., beta=.9, kw=2., kv=5e-5, kmu=1e-0, rho=1e-5, eta=1e-5, theta=-4., data=sampled_data, N=200, gsamps=200, epsilon=0.5)
+rbpf = RBPF(mux=x0, mumu=mu0, beta=beta, kw=kw, kv=kv, kmu=kmu, rho=rho, eta=eta, theta=theta, p=p, data=sampled_data, N=N, gsamps=gsamps2, epsilon=epsilon)
 ## - containers for storing results of rbpf - ##
 fig = plt.figure()
 ax1 = fig.add_subplot(311)
@@ -62,15 +80,15 @@ T = 0
 ## - plotting results of rbpf - ##
 ax1.plot(rbpf.times[T:-1], lss.observationvals[T:], label='true')
 ax1.plot(rbpf.times[T:], sm[T:], label='inferred')
-ax1.fill_between(rbpf.times[T:], (sm-1.96*np.sqrt(1.*sv))[T:], (sm+1.96*np.sqrt(1.*sv))[T:], color='orange', alpha=0.3)
+# ax1.fill_between(rbpf.times[T:], (sm-1.96*np.sqrt(1.*sv))[T:], (sm+1.96*np.sqrt(1.*sv))[T:], color='orange', alpha=0.3)
 
 ax2.plot(rbpf.times[T:-1], lss.observationgrad[T:])
 ax2.plot(rbpf.times[T:], gm[T:])
-ax2.fill_between(rbpf.times[T:], (gm-1.96*np.sqrt(gv))[T:], (gm+1.96*np.sqrt(gv))[T:], color='orange', alpha=0.3)
+# ax2.fill_between(rbpf.times[T:], (gm-1.96*np.sqrt(gv))[T:], (gm+1.96*np.sqrt(gv))[T:], color='orange', alpha=0.3)
 
 ax3.plot(rbpf.times[T:-1], lss.observationmus[T:])
 ax3.plot(rbpf.times[T:], mm[T:])
-ax3.fill_between(rbpf.times[T:], (mm-1.96*np.sqrt(mv))[T:], (mm+1.96*np.sqrt(mv))[T:], color='orange', alpha=0.3)
+# ax3.fill_between(rbpf.times[T:], (mm-1.96*np.sqrt(mv))[T:], (mm+1.96*np.sqrt(mv))[T:], color='orange', alpha=0.3)
 
 ax1.set_ylabel(r'Position, $x$')
 ax2.set_ylabel(r'Velocity, $\.x$')

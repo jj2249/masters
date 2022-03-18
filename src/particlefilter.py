@@ -17,7 +17,7 @@ class LangevinParticle(LangevinModel):
 	"""
 	Underlying particle object in the particle filter
 	"""
-	def __init__(self, mux, mumu, beta, kw, kv, kmu, rho, eta, theta, initial_observation, gsamps):
+	def __init__(self, mux, mumu, beta, kw, kv, kmu, rho, eta, theta, p, initial_observation, gsamps):
 		# model parameters
 		self.theta = theta
 		self.kv = kv
@@ -39,7 +39,7 @@ class LangevinParticle(LangevinModel):
 
 		x = (self.acc + Cc @ np.random.randn(3))
 		# LangevinModel.__init__(self, initial_state[0], initial_state[1], initial_state[2], 1., beta, kv, kmu, theta, gsamps)
-		LangevinModel.__init__(self, x[0], x[1], x[2], 1., beta, kv, kmu, theta, gsamps)
+		LangevinModel.__init__(self, x[0], x[1], x[2], 1., beta, kv, kmu, theta, p, gsamps)
 		# sample initial state using cholesky decomposition
 		# Cc = np.linalg.cholesky(self.Ccc + 1e-12*np.eye(3))
 		# self.alpha = self.acc + Cc @ np.random.randn(3)
@@ -147,7 +147,7 @@ class RBPF:
 	"""
 	Full rao-blackwellised (marginalised) particle filter
 	"""
-	def __init__(self, mux, mumu, beta, kw, kv, kmu, rho, eta, theta, data, N, gsamps, epsilon):
+	def __init__(self, mux, mumu, beta, kw, kv, kmu, rho, eta, theta, p, data, N, gsamps, epsilon):
 
 		# x and y values for the timeseries
 		self.times = data['Telapsed']
@@ -175,8 +175,10 @@ class RBPF:
 		self.rho = rho
 		self.eta = eta
 
+		self.p = p
+
 		# collection of particles
-		self.particles = [LangevinParticle(mux, mumu, beta, kw, kv, kmu, rho, eta, theta, self.current_price, gsamps) for _ in range(N)]
+		self.particles = [LangevinParticle(mux, mumu, beta, kw, kv, kmu, rho, eta, theta, p, self.current_price, gsamps) for _ in range(N)]
 		self.normalise_weights()
 	
 
