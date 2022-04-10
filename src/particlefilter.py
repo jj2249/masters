@@ -250,6 +250,7 @@ class RBPF:
 		Get the parameters of the corrected mixture distribution
 		"""
 		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
+		weights = np.nan_to_num(weights)
 		eX = np.array([particle.acc for particle in self.particles])
 
 		msum = np.sum(weights*eX, axis=0)
@@ -263,6 +264,7 @@ class RBPF:
 		Get the parameters of the predictive mixture distribution
 		"""
 		weights = np.array([np.exp(particle.logweight).reshape(1, -1) for particle in self.particles])
+		weights = np.nan_to_num(weights)
 		eX = np.array([particle.acp for particle in self.particles])
 
 		msum = np.sum(weights*eX, axis=0)
@@ -337,7 +339,7 @@ class RBPF:
 		return -(rhod+1)*np.log(x)-np.divide(etad, x)
 
 
-	def run_filter(self, ret_history=False, plot_marginal=False, ax=None, axsamps=1000, smin=0.1, smax=15., tpred=0.):
+	def run_filter(self, ret_history=False, plot_marginal=False, ax=None, axsamps=1000, smin=0.1, smax=15., tpred=0., sample=False, progbar=False):
 		"""
 		Main loop of particle filter
 		"""
@@ -364,7 +366,11 @@ class RBPF:
 			mu_means.append(smean[2, 0])
 			mu_variances.append(svar[2, 2])
 
-		for _ in tqdm(range(self.nobservations-1)):
+		if sample:
+			smean, svar = self.get_state_posterior()
+			state_samp = [smean + np.linalg.cholesky(svar) @ np.random.randn(3).reshape(-1, 1)]
+
+		for _ in tqdm(range(self.nobservations-1), disable=not progbar):
 			self.increment_particles()
 			# log marginal term added before reweighting (based on predictive weight)
 			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
@@ -383,6 +389,16 @@ class RBPF:
 
 				mu_means.append(smean[2, 0])
 				mu_variances.append(svar[2, 2])
+
+			if sample:
+				smean, svar = self.get_state_posterior()
+				# try:
+					# chol = np.linalg.cholesky(svar)
+				# except np.linalg.LinAlgError:
+					# print(svar)
+					# chol = np.linalg.cholesky(svar + 1e-10*np.eye(3))
+				chol = np.linalg.cholesky(svar)
+				state_samp.append(smean + chol @ np.random.randn(3).reshape(-1, 1))
 
 			if self.get_logDninf() < self.log_resample_limit:
 				self.resample_particles()
@@ -425,6 +441,9 @@ class RBPF:
 		elif ret_history:
 			return np.array(state_means), np.array(state_variances), np.array(grad_means), np.array(grad_variances), np.array(mu_means), np.array(mu_variances), self.log_marginal_likelihood
 		
+		elif sample:
+			return state_samp, self.log_marginal_likelihood
+
 		else:
 			return self.log_marginal_likelihood
 
