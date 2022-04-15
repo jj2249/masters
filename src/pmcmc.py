@@ -7,7 +7,7 @@ import sys
 class PMMH:
 	def __init__(self, mux, mumu, kw, rho, eta, data, N, gsamps, epsilon, delta, sampleX=False):
 		# initial parameter vector -- beta, theta, kv
-		self.phi = np.array([1., -1., 1.])
+		self.phi = np.array([.5, -.5, 0.5])
 
 		# RBPF parameters
 		self.mux = mux
@@ -31,7 +31,7 @@ class PMMH:
 
 		# scaling for the Gaussian Random walk
 		# self.GRW = np.linalg.cholesky(delta*np.eye(3))
-		self.GRW = np.linalg.cholesky(np.array([[0.01, 0., 0.],[0., 0.01, 0.],[0., 0., 0.01]]))
+		self.GRW = np.linalg.cholesky(np.array([[0.001, 0., 0.],[0., 0.001, 0.],[0., 0., 0.001]]))
 
 		self.phis = [self.phi]
 		if sampleX:

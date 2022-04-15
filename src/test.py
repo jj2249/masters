@@ -1,28 +1,36 @@
 import numpy as np
-import matplotlib.pyplot as plt
 import os
 from tqdm import tqdm
 import pandas as pd
 from datahandler import TimeseriesData
 from process import *
 from particlefilter import RBPF
-from matplotlib.colors import to_rgb
+import matplotlib as mpl
+# mpl.use("pgf")
+# mpl.rcParams.update({
+#     "pgf.texsystem": "pdflatex",
+#     'font.family': 'serif',
+#     'text.usetex': True,
+#     'pgf.rcfonts': False
+# })
 from scipy.stats import invgamma
 from scipy.special import gamma
 
-plt.style.use('ggplot')
+import matplotlib.pyplot as plt
 
+plt.style.use('seaborn')
+tw = 6.50127
 ### --- Forward Simulation --- ###
 
 x0 = 0.
 xd0 = 0.
 mu0 = 0.
 sigmasq = 1.
-beta = 5.
+beta = 2.
 kv = 5e-4
-kmu = 1e-5
+kmu = 1e-15
 theta = -2.
-p = 0.1
+p = 0.
 gsamps1 = 5_000
 
 kw = 2.
@@ -42,23 +50,42 @@ sampled_data = pd.DataFrame(data=sampled_dic)
 
 ## - option to plot simulated data - ##
 
+# fig = plt.figure()
+# ax1 = fig.add_subplot(311)
+# ax1.plot(lss.observationtimes, lss.observationvals)
+# # ax1.set_xticks([])
+
+# ax2 = fig.add_subplot(312)
+# ax2.plot(lss.observationtimes, lss.observationgrad)
+# # ax2.set_xticks([])
+
+# ax3 = fig.add_subplot(313)
+# ax3.plot(lss.observationtimes, lss.observationmus)
+
+# ax1.set_ylabel(r'Position, $x$')
+# ax2.set_ylabel(r'Velocity, $\.x$')
+# ax3.set_ylabel(r'Skew, $\mu$')
+# plt.show()
+
 fig = plt.figure()
-ax1 = fig.add_subplot(311)
+ax1 = fig.add_subplot(211)
 ax1.plot(lss.observationtimes, lss.observationvals)
 # ax1.set_xticks([])
+# ax1.xaxis.set_tick_params(length=0)
+plt.setp(ax1.get_xticklabels(), visible=False)
 
-ax2 = fig.add_subplot(312)
+ax2 = fig.add_subplot(212)
 ax2.plot(lss.observationtimes, lss.observationgrad)
 # ax2.set_xticks([])
 
-ax3 = fig.add_subplot(313)
-ax3.plot(lss.observationtimes, lss.observationmus)
-
 ax1.set_ylabel(r'Position, $x$')
-ax2.set_ylabel(r'Velocity, $\.x$')
-ax3.set_ylabel(r'Skew, $\mu$')
+ax2.set_ylabel(r'Velocity, $\dot{x}$')
+ax2.set_xlabel(r'Time, $t$')
+# plt.show()
+fig.set_size_inches(w=tw, h=0.5*tw)
+plt.tight_layout()
+# plt.savefig('../resources/figures/kurt2sde.pgf')
 plt.show()
-
 ### --- RBPF --- ###
 
 ## - define particle filter - ##
@@ -91,7 +118,7 @@ ax3.plot(rbpf.times[T:], mm[T:])
 # ax3.fill_between(rbpf.times[T:], (mm-1.96*np.sqrt(mv))[T:], (mm+1.96*np.sqrt(mv))[T:], color='orange', alpha=0.3)
 
 ax1.set_ylabel(r'Position, $x$')
-ax2.set_ylabel(r'Velocity, $\.x$')
+ax2.set_ylabel(r'Velocity, $\dot{x}$')
 ax3.set_ylabel(r'Skew, $\mu$')
 ax3.set_xlabel(r'Time, $t$')
 

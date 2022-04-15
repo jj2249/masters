@@ -156,18 +156,26 @@ class GammaProcess(JumpProcess):
 		self.sort_jumps()
 
 
+	def marginal_pdf(self, x, t):
+		return gamma.pdf(x, a=t*self.alpha**2/self.beta, loc=0, scale=self.beta/self.alpha)
+
+
+	def marginal_cdf(self, x, t):
+		return gamma.cdf(x, a=t*self.alpha**2/self.beta, loc=0, scale=self.beta/self.alpha)
+
+
 	def marginal_gamma(self, x, t, ax, label=''):
 		"""
 		Plot the marginal gamma distribution on a given set of axes
 		"""
-		ax.plot(gamma.pdf(x, a=t*self.alpha**2/self.beta, loc=0, scale=self.beta/self.alpha), x, label=label)
+		ax.plot(x, self.marginal_pdf(x, t), label=label)
 
 
 	def marginal_gamma_cdf(self, x, t, ax, label=''):
 		"""
 		Plot the marginal gamma cumulative distribution on a given set of axes
 		"""
-		ax.plot(x, gamma.cdf(x, a=t*self.alpha**2/self.beta, loc=0, scale=self.beta/self.alpha), label=label)
+		ax.plot(x, self.marginal_cdf(x, t), label=label)
 
 
 class VarianceGammaProcess(JumpProcess):
@@ -268,9 +276,9 @@ class LangevinModel:
 		"""
 		Noise matrix in state space model
 		"""
-		# return np.vstack([np.eye(2),
-		# 				np.zeros((1, 2))])
-		return np.eye(3)
+		return np.vstack([np.eye(2),
+						np.zeros((1, 2))])
+		# return np.eye(3)
 
 
 	def H_matrix(self):
@@ -315,9 +323,9 @@ class LangevinModel:
 		"""
 		Ce matrix for noise -- mu is uncorrelated with the main process
 		"""
-		return np.block([[Smat+reg*np.eye(2), np.zeros(2).reshape(-1,1)],
-						[np.zeros(2).reshape(-1,1).T , dt*self.kmu]])
-		# return Smat
+		# return np.block([[Smat+reg*np.eye(2), np.zeros(2).reshape(-1,1)],
+		# 				[np.zeros(2).reshape(-1,1).T , dt*self.kmu]])
+		return Smat + reg*np.eye(2)
 
 
 	def increment_process(self):
@@ -333,7 +341,7 @@ class LangevinModel:
 		Ce = self.dynamical_noise_cov(S, self.t-self.s, reg=1e-12)
 		Cec = np.linalg.cholesky(Ce)
 		# Cec = np.linalg.cholesky(Ce)
-		e = Cec @ np.random.randn(3)
+		e = Cec @ np.random.randn(2)
 
 		# extended state transition matrix
 		Amat = self.A_matrix(m, self.t-self.s)
