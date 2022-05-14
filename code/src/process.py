@@ -112,12 +112,21 @@ class GammaProcess(JumpProcess):
 		- implementation parameters
 		- latent epochs
 	"""
-	def __init__(self, alpha, beta, samps=1000, minT=0., maxT=1.):
-		JumpProcess.__init__(self, samps=samps, minT=minT, maxT=maxT)
+	def __init__(self, alpha, beta, minT=0., maxT=1.):
 
 		# mean drift rate and variance rate
 		self.alpha = alpha
 		self.beta = beta
+
+		gsamps = int(10./self.beta)
+		if gsamps < 50:
+			gsamps = 50
+		elif gsamps > 10000:
+			gsamps = 10000
+			print('Warning ---> beta too low for a good approximation')
+		# print(gsamps)
+		JumpProcess.__init__(self, samps=gsamps, minT=minT, maxT=maxT)
+
 		# parameters for rejection sampling (directly from levy measure)
 		self.C = alpha**2/beta
 		self.B = alpha/beta
@@ -135,7 +144,7 @@ class GammaProcess(JumpProcess):
 		return np.cumsum(times)
 	
 
-	def generate(self):
+	def generate(self, ret_accs=False):
 		"""
 		Rejection sampling method
 		"""
@@ -151,9 +160,10 @@ class GammaProcess(JumpProcess):
 		# corresponding jump times are uniformly distributed
 		self.samps = self.jsizes.shape[0]
 		self.jtimes = self.generate_times(no_of_acceps=self.samps)
-
 		# sort jumps in ascending time order
 		self.sort_jumps()
+		if ret_accs:
+			return self.samps
 
 
 	def marginal_pdf(self, x, t):
@@ -182,17 +192,17 @@ class VarianceGammaProcess(JumpProcess):
 	"""
 	Object for constructing and storing a single realisation of the VG process, plus it's latent gamma process
 	"""
-	def __init__(self, beta, mu, sigmasq, gsamps=500, minT=0., maxT=1.):
+	def __init__(self, beta, mu, sigmasq, minT=0., maxT=1.):
 		# generate latent gamma process
 		# defined in terms of alpha (mu), beta (nu) parameterisation - note that alpha=1 always
-		self.W = GammaProcess(1., beta, samps=gsamps, minT=minT, maxT=maxT)
+		self.W = GammaProcess(1., beta, samps, minT=minT, maxT=maxT)
 		self.W.generate()
 
 		# total number of samples can vary due to the rejection sampling
 		samps = self.W.jtimes.shape[0]
 
 		# parent intialisation
-		JumpProcess.__init__(self, samps=gsamps, minT=minT, maxT=maxT)
+		JumpProcess.__init__(self, samps=samps, minT=minT, maxT=maxT)
 
 		# VG jumps occur at the same time as the gamma jumps --- is this true???
 		self.jtimes = self.W.jtimes
@@ -235,9 +245,9 @@ class LangevinModel:
 	"""
 	State-space langevin model. State vector contains position, derivative and mean reversion parameter
 	"""
-	def __init__(self, x0, xd0, mu, sigmasq, beta, kv, kmu, theta, p, gsamps):
+	def __init__(self, x0, xd0, mu, sigmasq, beta, kv, kmu, theta, p):
 		# implementation paramters
-		self.gsamps = gsamps
+		# self.gsamps = gsamps
 
 		# model parameters
 		self.theta = theta
@@ -263,14 +273,15 @@ class LangevinModel:
 		"""
 		State transition matrix constructor -- depends on non-linear part of the state (W)
 		"""
-		num = np.random.rand()
+		# num = np.random.rand()
 		A = np.block([[self.langevin_drift(dt, self.theta), m],
 						[np.zeros((1, 2)), 1.]])
-		if num < self.p:
-			A[1,1] = 0.
-			return A
-		else:
-			return A
+		return A
+		# if num < self.p:
+		# 	A[1,1] = 0.
+		# 	return A
+		# else:
+		# 	return A
 
 	def B_matrix(self):
 		"""
@@ -330,7 +341,7 @@ class LangevinModel:
 
 	def increment_process(self):
 		# latent jumps from gamma process
-		Z = GammaProcess(1., self.beta, samps=self.gsamps, minT=self.s, maxT=self.t)
+		Z = GammaProcess(1., self.beta, minT=self.s, maxT=self.t)
 		Z.generate()
 
 		# calculate m, S for this realisation of latent jumps

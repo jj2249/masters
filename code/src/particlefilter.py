@@ -36,7 +36,7 @@ class LangevinParticle(LangevinModel):
 	"""
 	Underlying particle object in the particle filter
 	"""
-	def __init__(self, mux, mumu, beta, kw, kv, kmu, rho, eta, theta, p, initial_observation, gsamps):
+	def __init__(self, mux, mumu, beta, kw, kv, kmu, rho, eta, theta, p, initial_observation):
 		# model parameters
 		self.theta = theta
 		self.kv = kv
@@ -45,8 +45,8 @@ class LangevinParticle(LangevinModel):
 		self.rho = rho
 		self.eta = eta
 		
-		# implementation parameters
-		self.gsamps = gsamps
+		# # implementation parameters
+		# self.gsamps = gsamps
 
 		# initial kalman parameters -- also form the prior distribution
 		# a current current
@@ -58,7 +58,7 @@ class LangevinParticle(LangevinModel):
 
 		self.acc = self.acc + (Cc @ np.random.randn(3)).reshape(-1, 1)
 		# LangevinModel.__init__(self, initial_state[0], initial_state[1], initial_state[2], 1., beta, kv, kmu, theta, gsamps)
-		LangevinModel.__init__(self, self.acc[0,0], self.acc[1,0], self.acc[2,0], 1., beta, kv, kmu, theta, p, gsamps)
+		LangevinModel.__init__(self, self.acc[0,0], self.acc[1,0], self.acc[2,0], 1., beta, kv, kmu, theta, p)
 		# sample initial state using cholesky decomposition
 		# Cc = np.linalg.cholesky(self.Ccc + 1e-12*np.eye(3))
 		# self.alpha = self.acc + Cc @ np.random.randn(3)
@@ -84,7 +84,7 @@ class LangevinParticle(LangevinModel):
 		# time interval between two observations
 		dt = t - s
 		# latent gamma process
-		Z = GammaProcess(1., self.beta, samps=self.gsamps, minT=s, maxT=t)
+		Z = GammaProcess(1., self.beta, minT=s, maxT=t)
 		Z.generate()
 
 		# parameters for estimating stochastic integral
@@ -166,7 +166,7 @@ class RBPF:
 	"""
 	Full rao-blackwellised (marginalised) particle filter
 	"""
-	def __init__(self, mux, mumu, beta, kw, kv, kmu, rho, eta, theta, p, data, N, gsamps, epsilon):
+	def __init__(self, mux, mumu, beta, kw, kv, kmu, rho, eta, theta, p, data, N, epsilon):
 
 		# x and y values for the timeseries
 		# self.times = data['Telapsed']
@@ -200,7 +200,7 @@ class RBPF:
 		self.p = p
 
 		# collection of particles
-		self.particles = [LangevinParticle(mux, mumu, beta, kw, kv, kmu, rho, eta, theta, p, self.current_price, gsamps) for _ in range(N)]
+		self.particles = [LangevinParticle(mux, mumu, beta, kw, kv, kmu, rho, eta, theta, p, self.current_price) for _ in range(N)]
 		self.normalise_weights()
 	
 
@@ -504,7 +504,7 @@ class RBPF:
 		skews = np.zeros((self.nobservations, self.N))
 		weights = np.zeros((self.nobservations, self.N))
 		weights[0, :] = -np.log(self.N)*np.ones(self.N)
-		for i in tqdm(range(self.nobservations-1)):
+		for i in (range(self.nobservations-1)):
 			self.increment_particles()
 			self.normalise_weights()
 

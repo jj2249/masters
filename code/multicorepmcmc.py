@@ -1,12 +1,14 @@
 import numpy as np
-from pmcmc import PMMH
+from src.pmcmc import PMMH
 from p_tqdm import p_umap
 from functools import partial
-from process import LangevinModel
+from src.process import LangevinModel
 import pandas as pd
+import matplotlib.pyplot as plt
 
-def sampler(mux, mumu, kw, kv, rho, eta, data, N, gsamps, epsilon, delta, nits):
-	pmmh = PMMH(mux, mumu, kw, kv, rho, eta, data, N, gsamps, epsilon, delta, sampleX=False)
+
+def sampler(mux, mumu, kw, kv, rho, eta, data, N, epsilon, delta, nits):
+	pmmh = PMMH(mux, mumu, kw, kv, rho, eta, data, N, epsilon, delta, sampleX=False)
 	phis = pmmh.run_sampler(nits)
 	return phis
 
@@ -20,27 +22,42 @@ if __name__ == '__main__':
 	xd0 = 0.
 	mu0 = 0.
 	sigmasq = 1.
-	beta = 2.
-	kv = 5e-4
-	kmu = 1e-5
-	theta = -2.
+	beta = 1.
+	kv = 1e-4
+	kmu = 0.
+	theta = -3.
 	p = 0.
-	gsamps1 = 5_000
 
-	kw = 2.
+	kw = 1.
 	rho = 1e-5
 	eta = 1e-5
-	N = 400
-	gsamps2 = 200
+	N = 500
 	epsilon = 0.5
 
-	lss = LangevinModel(x0=x0, xd0=xd0, mu=mu0, sigmasq=sigmasq, beta=beta, kv=kv, kmu=kmu, theta=theta, p=p, gsamps=gsamps1)
-	lss.generate(nobservations=50)
+	lss = LangevinModel(x0=x0, xd0=xd0, mu=mu0, sigmasq=sigmasq, beta=beta, kv=kv, kmu=kmu, theta=theta, p=p)
+	lss.generate(nobservations=100)
+
+	fig = plt.figure()
+	ax1 = fig.add_subplot(211)
+	ax1.plot(lss.observationtimes, lss.observationvals)
+	
+	plt.setp(ax1.get_xticklabels(), visible=False)
+
+	ax2 = fig.add_subplot(212)
+	ax2.plot(lss.observationtimes, lss.observationgrad)
+	ax1.set_xticks([])
+
+	ax1.set_ylabel(r'Position, $x$')
+	ax2.set_ylabel(r'Velocity, $\dot{x}$')
+	ax2.set_xlabel(r'Time, $t$')
+	fig.set_size_inches(w=6., h=0.5*6.)
+	plt.tight_layout()
+	plt.show()
 
 
 	## - store data in a dataframe - ##
-	sampled_dic = {'Telapsed': lss.observationtimes, 'Price': lss.observationvals}
+	sampled_dic = {'DateTime': lss.observationtimes, 'Bid': lss.observationvals}
 	sampled_data = pd.DataFrame(data=sampled_dic)
 
-	results = p_umap(partial(sampler, mumu=mu0, kw=kw, kv = kv, rho=rho, eta=eta, data=sampled_data, N=N, gsamps=gsamps2, epsilon=epsilon, delta=.75, nits=1350), x0*np.ones(8))
-	np.save('./samples3.npy', results)
+	results = p_umap(partial(sampler, mumu=mu0, kw=kw, kv = kv, rho=rho, eta=eta, data=sampled_data, N=N, epsilon=epsilon, delta=.75, nits=6000), x0*np.ones(8))
+	np.savez('./samples4.npz', results, lss, pickle=True)

@@ -36,18 +36,18 @@ kv = 1e-4
 kmu = 1e-15
 theta = -3.
 p = 0.
-gsamps1 = 100_000
+# gsamps1 = 100_000
 
 kw = 1.
 rho = 1e-5
 eta = 1e-5
 N = 500
-gsamps2 = 500
+# gsamps2 = 500
 epsilon = 0.5
 
 nobs = 100
 
-lss = LangevinModel(x0=x0, xd0=xd0, mu=mu0, sigmasq=sigmasq, beta=beta, kv=kv, kmu=kmu, theta=theta, p=p, gsamps=gsamps1)
+lss = LangevinModel(x0=x0, xd0=xd0, mu=mu0, sigmasq=sigmasq, beta=beta, kv=kv, kmu=kmu, theta=theta, p=p)
 lss.generate(nobservations=nobs)
 
 
@@ -79,7 +79,7 @@ plt.show()
 
 ## - define particle filter - ##
 
-rbpf = RBPF(mux=x0, mumu=0., beta=beta, kw=kw, kv=kv, kmu=kmu, rho=rho, eta=eta, theta=theta, p=p, data=sampled_data, N=N, gsamps=gsamps2, epsilon=epsilon)
+rbpf = RBPF(mux=x0, mumu=0., beta=beta, kw=kw, kv=kv, kmu=kmu, rho=rho, eta=eta, theta=theta, p=p, data=sampled_data, N=N, epsilon=epsilon)
 ## - containers for storing results of rbpf - ##
 fig = plt.figure()
 ax1 = fig.add_subplot(211)

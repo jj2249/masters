@@ -5,9 +5,10 @@ import sys
 
 
 class PMMH:
-	def __init__(self, mux, mumu, kw, kv, rho, eta, data, N, gsamps, epsilon, delta, sampleX=False):
+	def __init__(self, mux, mumu, kw, kv, rho, eta, data, N, epsilon, delta, sampleX=False):
 		# initial parameter vector -- beta, theta, kv
-		self.phi = np.array([10., -10.])
+		# self.phi = np.array([10., -10.])
+		self.phi = np.array([10.*np.random.rand()+0.01, -10.*np.random.rand()-0.01])
 
 		# RBPF parameters
 		self.mux = mux
@@ -20,10 +21,9 @@ class PMMH:
 		self.p = 0.
 		self.data = data
 		self.N = N
-		self.gsamps = gsamps
 		self.epsilon = epsilon
 
-		rbpf = RBPF(self.mux, self.mumu, self.phi[0], self.kw, self.kv, self.kmu, self.rho, self.eta, self.phi[1], self.p, self.data, self.N, self.gsamps, self.epsilon)
+		rbpf = RBPF(self.mux, self.mumu, self.phi[0], self.kw, self.kv, self.kmu, self.rho, self.eta, self.phi[1], self.p, self.data, self.N, self.epsilon)
 		
 		if sampleX:
 			self.X, self.lml = rbpf.run_filter(sample=True)
@@ -44,7 +44,7 @@ class PMMH:
 		cnt = 0.
 		for _ in tqdm(range(nits)):
 			phistar = self.phi + self.GRW @ np.random.randn(2)
-			rbpf = RBPF(self.mux, self.mumu, phistar[0], self.kw, self.kv, self.kmu, self.rho, self.eta, phistar[1], self.p, self.data, self.N, self.gsamps, self.epsilon)
+			rbpf = RBPF(self.mux, self.mumu, phistar[0], self.kw, self.kv, self.kmu, self.rho, self.eta, phistar[1], self.p, self.data, self.N, self.epsilon)
 			if self.sampleX:
 				Xstar, lmlstar = rbpf.run_filter(sample=True)
 			else:
@@ -68,4 +68,4 @@ class PMMH:
 		if self.sampleX:
 			return self.Xs, self.phis
 		else:
-			return self.phis
+			return (accs/cnt, np.array(self.phis))
