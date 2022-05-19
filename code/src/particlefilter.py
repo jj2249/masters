@@ -214,6 +214,7 @@ class RBPF:
 		for particle in self.particles:
 			# log domain
 			particle.logweight = particle.logweight - sum_weights
+		return sum_weights
 
 	
 	def observe(self):
@@ -332,12 +333,12 @@ class RBPF:
 		return -np.max(lweights)
 
 
-	def get_log_predictive_likelihood(self):
-		"""
-		Sum of predictive weights gives the log likelihood
-		"""
-		lweights = np.array([particle.logweight for particle in self.particles])
-		return logsumexp(lweights, lambda x : 1., np.ones(lweights.shape[0]), retlog=True)
+	# def get_log_predictive_likelihood(self):
+	# 	"""
+	# 	Sum of predictive weights gives the log likelihood
+	# 	"""
+	# 	lweights = np.array([particle.logweight for particle in self.particles])
+	# 	return logsumexp(lweights, lambda x : 1., np.ones(lweights.shape[0]), retlog=True)
 
 
 	def sigma_posterior(self, x, count, E):
@@ -381,9 +382,8 @@ class RBPF:
 		for _ in tqdm(range(self.nobservations-1), disable=not progbar):
 			self.increment_particles()
 			# log marginal term added before reweighting (based on predictive weight)
-			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
-			self.normalise_weights()
-
+			incremental_log_like = self.normalise_weights()
+			self.log_marginal_likelihood += incremental_log_like
 			d = self.get_logDninf()
 			p = self.get_logPn2()
 			if d < self.log_resample_limit:
@@ -475,8 +475,8 @@ class RBPF:
 		for _ in (range(self.nobservations-1)):
 			self.increment_particles()
 			# log marginal term added before reweighting (based on predictive weight)
-			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
-			self.normalise_weights()
+			incremental_log_like = self.normalise_weights()
+			self.log_marginal_likelihood += incremental_log_like
 			if self.get_logDninf() < self.log_resample_limit:
 				self.resample_particles()
 	
@@ -487,8 +487,8 @@ class RBPF:
 		for _ in (range(self.nobservations-1)):
 			self.increment_particles()
 			# log marginal term added before reweighting (based on predictive weight)
-			self.log_marginal_likelihood += self.get_log_predictive_likelihood()
-			self.normalise_weights()
+			incremental_log_like = self.normalise_weights()
+			self.log_marginal_likelihood += incremental_log_like
 			if self.get_logDninf() < self.log_resample_limit:
 				self.resample_particles()
 	
@@ -506,7 +506,7 @@ class RBPF:
 		weights[0, :] = -np.log(self.N)*np.ones(self.N)
 		for i in (range(self.nobservations-1)):
 			self.increment_particles()
-			self.normalise_weights()
+			_ = self.normalise_weights()
 
 			if self.get_logDninf() < self.log_resample_limit:
 				self.resample_particles()
@@ -533,7 +533,7 @@ class RBPF:
 		weights[0, :] = -np.log(self.N)*np.ones(self.N)
 		for i in tqdm(range(self.nobservations-1-npred)):
 			self.increment_particles()
-			self.normalise_weights()
+			_ = self.normalise_weights()
 
 			if self.get_logDninf() < self.log_resample_limit:
 				self.resample_particles()

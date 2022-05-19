@@ -195,7 +195,7 @@ class VarianceGammaProcess(JumpProcess):
 	def __init__(self, beta, mu, sigmasq, minT=0., maxT=1.):
 		# generate latent gamma process
 		# defined in terms of alpha (mu), beta (nu) parameterisation - note that alpha=1 always
-		self.W = GammaProcess(1., beta, samps, minT=minT, maxT=maxT)
+		self.W = GammaProcess(1., beta, minT=minT, maxT=maxT)
 		self.W.generate()
 
 		# total number of samples can vary due to the rejection sampling
@@ -213,13 +213,15 @@ class VarianceGammaProcess(JumpProcess):
 		self.beta = beta
 
 
-	def generate(self):
+	def generate(self, ret_accs=False):
 		"""
 		Brownian motion with time steps taken as the jump sizes of the latent gamma process
 		"""
 		# faster to sample all normal rvs at once
 		normal = np.random.randn(self.W.samps)
 		self.jsizes = (self.mu*self.W.jsizes) + (np.sqrt(self.sigmasq*self.W.jsizes) * normal)
+		if ret_accs:
+			return self.W.samps
 
 
 	def marginal_pdf(self, x, t):

@@ -23,8 +23,8 @@ n = 10000
 # vg = VarianceGammaProcess(0.1, 0., 1.)
 # vg2 = VarianceGammaProcess
 # betas = np.array([2., 1., 0.5, 0.1, 0.05, 0.01, 0.001])
-beta = 1e-3
-g = GammaProcess(1., beta)
+beta = 1.
+g = GammaProcess(1., beta, minT=0., maxT=.0000005)
 final_vals = []
 # final_vals2 = []
 # gsamples = np.arange(100, 3000, 50)

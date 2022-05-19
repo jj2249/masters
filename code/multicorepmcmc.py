@@ -22,10 +22,10 @@ if __name__ == '__main__':
 	xd0 = 0.
 	mu0 = 0.
 	sigmasq = 1.
-	beta = 1.
-	kv = 1e-4
+	beta = 0.8
+	kv = 1e-3
 	kmu = 0.
-	theta = -3.
+	theta = -2.
 	p = 0.
 
 	kw = 1.
@@ -59,5 +59,5 @@ if __name__ == '__main__':
 	sampled_dic = {'DateTime': lss.observationtimes, 'Bid': lss.observationvals}
 	sampled_data = pd.DataFrame(data=sampled_dic)
 
-	results = p_umap(partial(sampler, mumu=mu0, kw=kw, kv = kv, rho=rho, eta=eta, data=sampled_data, N=N, epsilon=epsilon, delta=.75, nits=6000), x0*np.ones(8))
-	np.savez('./samples4.npz', results, lss, pickle=True)
+	results = p_umap(partial(sampler, mumu=mu0, kw=kw, kv=kv, rho=rho, eta=eta, data=sampled_data, N=N, epsilon=epsilon, delta=.45, nits=3000), x0*np.ones(8))
+	np.savez('./samples6.npz', results, lss, pickle=True)
