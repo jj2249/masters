@@ -22,7 +22,7 @@ def info(title):
 
 
 def filt_grid_search(theta, beta, data):
-	return RBPF(mux=0., mumu=0., beta=beta, kw=1., kv=1e-3, kmu=1e-6, rho=1., eta=1., theta=theta, p=0., data=data, N=200, epsilon=0.5).run_filter_MP()
+	return RBPF(mux=0., mumu=0., beta=beta, kw=1., kv=1e-3, kmu=1e-6, rho=1., eta=1., theta=theta, p=0., data=data, N=1000, epsilon=0.5).run_filter_MP()
 
 
 def filt_grid_search_kv(kv, data):
@@ -32,11 +32,12 @@ def filt_grid_search_kv(kv, data):
 ### need to make sure that process spawning only happens once
 if __name__ == '__main__':
 	info('main line')
-	np.random.seed(22)
+	np.random.seed(25)
 	lss = LangevinModel(x0=0., xd0=0., mu=0., sigmasq=1., beta=1., kv=1e-3, kmu=1e-6, theta=-3., p=0.)
 	lss.generate(nobservations=100)
-
-	G = 50
+	tw = 6.50127
+	th = 9.00177
+	G = 20
 
 	## - import data from a .csv - ##
 
@@ -45,9 +46,12 @@ if __name__ == '__main__':
 	# plt.plot(df_u['Date_Time'], df_u['Price'])
 	# plt.xticks([])
 	# plt.show()
-
-	thetas = np.linspace(-15., -.1, G)
-	betas = np.linspace(0.01, 3., G)
+	thmin = -15.
+	thmax = -0.1
+	bmin = 0.01
+	bmax = 3.
+	thetas = np.linspace(thmin, thmax, G)
+	betas = np.linspace(bmin, bmax, G)
 	grid = np.array(list(product(thetas, betas)))
 	theta_vals = grid[:,0]
 	beta_vals = grid[:,1]
@@ -91,11 +95,14 @@ if __name__ == '__main__':
 	
 	fig = plt.figure()
 	ax = fig.add_subplot()
-	ax.contour(theta_vals, beta_vals, lml_vals, cmap='plasma', N=100)
+	# ax.contourf(theta_vals, beta_vals, lml_vals)
+	x,y = np.meshgrid(theta_vals, beta_vals)
+	ax.imshow(lml_vals, extent=[thmin, thmax, bmin, bmax], origin='lower', interpolation='bilinear')
 	# ax.plot(theta_vals, lml_vals)
 	ax.set_xlabel(r'$\theta$')
 	ax.set_ylabel(r'$\beta$')
 	# ax.set_ylabel('lml')
+	# fig.set_size_inches(w=tw, h=th/3.5)
 	plt.show()
 
 	# sampled_dic = {'DateTime': lss.observationtimes, 'Big': lss.observationvals}
