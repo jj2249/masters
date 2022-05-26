@@ -10,7 +10,7 @@ import os
 
 
 def filt_grid_search(theta, beta, data):
-	return RBPF(mux=0.84227, mumu=0., beta=beta, kw=1e-6, kv=5e0, kmu=0., rho=1e-5, eta=1e-5, theta=theta, p=0., data=data, N=200, gsamps=200, epsilon=0.5).run_filter_MP()
+	return RBPF(mux=0.84227, mumu=0., beta=beta, kw=1e-10, kv=10., kmu=0., rho=1e-5, eta=1e-5, theta=theta, p=0., data=data, N=200, epsilon=0.5).run_filter_MP()
 
 
 ### need to make sure that process spawning only happens once
@@ -19,15 +19,15 @@ if __name__ == '__main__':
 	### --- importing data --- ###
 
 	## - import data from a .csv - ##
-	tobj = TickData(os.pardir+"/resources/data/EURGBP-2022-04.csv", nrows=250)
+	tobj = TickData(os.pardir+"/resources/data/EURGBP-2022-04.csv", nrows=200)
 	
 	# lss = LangevinModel(x0=0., xd0=0., mu=0., sigmasq=1., beta=0.8, kv=1e-6, kmu=1e-6, theta=-15., gsamps=100)
 	# lss.generate(nobservations=200)
 	Gt = 25
 	Gb = 25
 
-	thetas = np.linspace(-15., -0.8, Gt)
-	betas = np.linspace(.001, 10., Gb)
+	thetas = np.linspace(-25., -0.01, Gt)
+	betas = np.linspace(.02, 4., Gb)
 	grid = np.array(list(product(thetas, betas)))
 	theta_vals = grid[:,0]
 	beta_vals = grid[:,1]

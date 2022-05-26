@@ -41,5 +41,5 @@ class TickData:
 
 
 	def plot(self, ax):
-		ax.plot(self.df['DateTime'], self.df['Bid'])
+		ax.plot(self.df['DateTime'], self.df['Bid'], color='black', ls='--', lw=0., marker='.', ms=2., mec='black', mfc='black')
 		ax.set_xticks([])

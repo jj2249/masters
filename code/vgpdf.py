@@ -1,14 +1,14 @@
-from process import VarianceGammaProcess, GammaProcess
+from src.process import VarianceGammaProcess, GammaProcess
 import numpy as np
 
 import matplotlib as mpl
 # mpl.use("pgf")
-# mpl.rcParams.update({
-#     "pgf.texsystem": "pdflatex",
-#     'font.family': 'serif',
-#     'text.usetex': True,
-#     'pgf.rcfonts': False
-# })
+mpl.rcParams.update({
+    "pgf.texsystem": "pdflatex",
+    'font.family': 'serif',
+    'text.usetex': True,
+    'pgf.rcfonts': False
+})
 import matplotlib.pyplot as plt
 
 plt.style.use('ggplot')
@@ -21,7 +21,7 @@ n = 10000
 vg = VarianceGammaProcess(1., 0., 1.)
 vg2 = VarianceGammaProcess(2., 0., 1.)
 vg3 = VarianceGammaProcess(1., 1., 1.)
-vg4 = VarianceGammaProcess()
+# vg4 = VarianceGammaProcess()
 g = GammaProcess(2., 1.)
 
 fig = plt.figure()

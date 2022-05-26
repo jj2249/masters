@@ -88,10 +88,13 @@ class LangevinParticle(LangevinModel):
 		Z.generate()
 
 		# parameters for estimating stochastic integral
-		m = self.langevin_m(t, self.theta, Z)
-		# S = self.sigmasq*self.langevin_S(t, self.theta, Z)
-		S = self.langevin_S(t, self.theta, Z)
-
+		try:
+			S = self.langevin_S(t, self.theta, Z)
+			_ = np.linalg.cholesky(S)
+			m = self.langevin_m(t, self.theta, Z)
+		except np.linalg.LinAlgError:
+			S = np.zeros((2, 2))
+			m = np.zeros((2, 1))
 		Amat = self.A_matrix(m, dt)
 		Ce = self.dynamical_noise_cov(S, dt)
 
@@ -101,25 +104,6 @@ class LangevinParticle(LangevinModel):
 		if ret:
 			return self.acp, self.Ccp
 
-
-	def get_initial_weight(self, observation):
-		########################
-		### Is this correct? ###
-		########################
-		var = self.kv + self.kw
-		return ((-0.5 * np.log(2.*np.pi*var)) - (1./(2.*var))*np.square(observation-self.state[0]))[0]
-
-
-	# def log_weight_update(self, observation):
-	# 	# Prediction Error Decomposition
-	# 	ayt = (self.Hmat @ self.acp)
-	# 	# Cyt = (self.Hmat @ Ccp @ self.Hmat.T) + (self.sigmasq*self.kv)
-	# 	Cyt = (self.Hmat @ self.Ccp @ self.Hmat.T) + (self.kv)
-	# 	Cyt = Cyt.flatten()
-
-	# 	# update log weight
-	# 	# print(((-0.5 * np.log(Cyt)) - (1./(2.*Cyt))*np.square(observation-ayt)).item())
-	# 	return ((-0.5 * np.log(Cyt)) - (1./(2.*Cyt))*np.square(observation-ayt)).item()
 
 	def log_weight_update(self, observation):
 		self.count += 1
@@ -161,7 +145,6 @@ class LangevinParticle(LangevinModel):
 		self.correct(observation)
 
 
-
 class RBPF:
 	"""
 	Full rao-blackwellised (marginalised) particle filter
@@ -198,6 +181,9 @@ class RBPF:
 		self.eta = eta
 
 		self.p = p
+
+		self.mux = mux
+		self.mumu = mumu
 
 		# collection of particles
 		self.particles = [LangevinParticle(mux, mumu, beta, kw, kv, kmu, rho, eta, theta, p, self.current_price) for _ in range(N)]
@@ -353,8 +339,8 @@ class RBPF:
 		"""
 		if ret_history:
 			MSEs = []
-			dss = []
-			pss = []
+			dss = [np.log(self.N)]
+			pss = [np.log(self.N)]
 			state_means = []
 			state_variances = []
 
@@ -495,7 +481,7 @@ class RBPF:
 		return (self.kv, self.log_marginal_likelihood)
 
 
-	def run_filter_full_hist(self):
+	def run_filter_full_hist(self, progbar=False):
 		"""
 		Run the particle filter and return all particles
 		"""
@@ -504,7 +490,10 @@ class RBPF:
 		skews = np.zeros((self.nobservations, self.N))
 		weights = np.zeros((self.nobservations, self.N))
 		weights[0, :] = -np.log(self.N)*np.ones(self.N)
-		for i in (range(self.nobservations-1)):
+		states[0, :] = np.array([particle.acc[0,0] for particle in self.particles])
+		grads[0, :] = np.array([particle.acc[1,0] for particle in self.particles])
+		skews[0, :] = np.array([particle.acc[2,0] for particle in self.particles])
+		for i in tqdm((range(self.nobservations-1)), disable=not progbar):
 			self.increment_particles()
 			_ = self.normalise_weights()
 

@@ -100,7 +100,7 @@ class JumpProcess(Process):
 		Construct and then plot the process skeleton
 		"""
 		t, f = self.construct_timeseries(samples=samples)
-		ax.step(t, f, label=label)
+		ax.step(t, f, label=label, lw=1.2)
 		return ax
 
 
@@ -131,7 +131,6 @@ class GammaProcess(JumpProcess):
 		self.C = alpha**2/beta
 		self.B = alpha/beta
 		self.rate = 1./(maxT-minT)
-
 
 	
 	def generate_epochs(self):
@@ -262,9 +261,12 @@ class LangevinModel:
 		# initial state
 		self.state = np.array([x0, xd0, mu])
 		# containers for state variables over time --- not final
+		self.underlyingvals = [x0]
 		self.observationvals = [x0]
 		self.observationgrad = [xd0]
 		self.observationmus = [mu]
+		self.jtimes = []
+		self.jsizes = []
 		
 		# use constructor functions to build state space matrices (only those that do not depend on generation of the non-linear part)
 		self.Bmat = self.B_matrix()
@@ -351,10 +353,13 @@ class LangevinModel:
 		S = self.sigmasq*self.langevin_S(self.t, self.theta, Z)
 
 		# cholesky decomposition for sampling of noise
-		Ce = self.dynamical_noise_cov(S, self.t-self.s, reg=1e-12)
-		Cec = np.linalg.cholesky(Ce)
-		# Cec = np.linalg.cholesky(Ce)
-		e = Cec @ np.random.randn(2)
+		Ce = self.dynamical_noise_cov(S, self.t-self.s, reg=0.)
+		try:
+			Cec = np.linalg.cholesky(Ce)
+			e = Cec @ np.random.randn(2)
+		except np.linalg.LinAlgError:
+			# print('Truncating innovation to zero, dt = ' + str(self.t-self.s))
+			e = np.zeros(2)
 
 		# extended state transition matrix
 		Amat = self.A_matrix(m, self.t-self.s)
@@ -365,9 +370,12 @@ class LangevinModel:
 		# observation bits --- not final
 		new_observation = self.Hmat @ self.state + np.sqrt(self.sigmasq*self.kv)*np.random.randn()
 		lastobservation = new_observation[0]
+		self.underlyingvals.append(self.state[0])
 		self.observationvals.append(lastobservation)
 		self.observationgrad.append(self.state[1])
 		self.observationmus.append(self.state[2])
+		self.jtimes = self.jtimes + Z.jtimes.tolist()
+		self.jsizes = self.jsizes + Z.jsizes.tolist()
 		
 	
 	def generate(self, nobservations=100):
